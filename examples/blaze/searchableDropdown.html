@@ -1,0 +1,22 @@
+<!--
+  searchableDropdown.html — Blaze wrapper around the framework-agnostic control.
+
+  WHAT: A thin Blaze template that renders an empty mount point and lets the
+        vanilla SearchableDropdown class take over in onRendered. This way a
+        Meteor/Blaze app uses the EXACT same JS + CSS as every other framework —
+        no Blaze-specific reimplementation.
+
+  USAGE in a parent template:
+    {{> searchableDropdown
+          name="customerId"
+          label="Customer"
+          collectionKey="customers"
+          allowCreate=true
+          onSelect=onCustomerSelect }}
+
+  Load dist/searchable-dropdown.css once in your app's <head>, and import the
+  class in searchableDropdown.js (see that file).
+-->
+<template name="searchableDropdown">
+  <div class="sdd-blaze-mount"></div>
+</template>

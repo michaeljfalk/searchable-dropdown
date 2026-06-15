@@ -1,0 +1,14 @@
+{
+  "name": "searchable-dropdown-express-mongo-example",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Express + MongoDB + EJS demo for searchable-dropdown",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "mongodb": "^6.8.0"
+  }
+}

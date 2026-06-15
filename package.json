@@ -1,0 +1,42 @@
+{
+  "name": "searchable-dropdown",
+  "version": "1.0.0",
+  "description": "Framework-agnostic, dependency-free searchable dropdown / combobox with array or MongoDB sources, a [+ Add new] create flow, and a drop-in <select> replacement.",
+  "main": "dist/searchable-dropdown.js",
+  "module": "dist/searchable-dropdown.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/searchable-dropdown.mjs",
+      "require": "./dist/searchable-dropdown.js"
+    },
+    "./css": "./dist/searchable-dropdown.css",
+    "./auto": "./dist/searchable-dropdown-auto.js",
+    "./server": "./server/searchable-dropdown-mongo.js"
+  },
+  "files": [
+    "dist/",
+    "server/",
+    "IMPLEMENTATION.md"
+  ],
+  "keywords": [
+    "dropdown",
+    "select",
+    "combobox",
+    "autocomplete",
+    "searchable",
+    "vanilla-js",
+    "mongodb",
+    "express",
+    "ejs",
+    "blaze"
+  ],
+  "sideEffects": [
+    "dist/searchable-dropdown.js",
+    "dist/searchable-dropdown-auto.js"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/michaeljfalk/dispatch-select.git"
+  }
+}

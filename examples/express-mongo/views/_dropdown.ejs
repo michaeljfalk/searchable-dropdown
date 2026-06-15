@@ -1,0 +1,43 @@
+<%
+/*
+ * _dropdown.ejs — reusable EJS partial that renders the control DECLARATIVELY.
+ *
+ * No inline JavaScript: every value is emitted as an HTML-escaped data-*
+ * attribute (via <%= %>), and searchable-dropdown-auto.js mounts it on load.
+ * This keeps server data out of <script> tags entirely (no XSS surface).
+ *
+ * Include it with:
+ *   <%- include('_dropdown', {
+ *         name: 'customerId',
+ *         label: 'Customer',
+ *         apiKey: 'customers',                 // registry key on the server
+ *         allowCreate: true,
+ *         value: customer ? customer._id : '', // optional, edit mode
+ *         valueLabel: customer ? customer.name : '',
+ *       }) %>
+ *
+ * Requires on the page (once):
+ *   <link rel="stylesheet" href="/dist/searchable-dropdown.css">
+ *   <script src="/dist/searchable-dropdown.js"></script>
+ *   <script src="/dist/searchable-dropdown-auto.js"></script>
+ */
+const _name        = typeof name        !== 'undefined' ? name        : '';
+const _label       = typeof label       !== 'undefined' ? label       : '';
+const _placeholder = typeof placeholder !== 'undefined' ? placeholder : 'Search…';
+const _apiKey      = typeof apiKey      !== 'undefined' ? apiKey      : '';
+const _baseUrl     = typeof baseUrl     !== 'undefined' ? baseUrl     : '/api/dropdown';
+const _allowCreate = typeof allowCreate !== 'undefined' ? !!allowCreate : false;
+const _value       = typeof value       !== 'undefined' && value      != null ? value      : '';
+const _valueLabel  = typeof valueLabel  !== 'undefined' && valueLabel != null ? valueLabel : '';
+const _required    = typeof required    !== 'undefined' ? !!required  : false;
+%>
+<div data-sdd-mount
+     data-name="<%= _name %>"
+     data-label="<%= _label %>"
+     data-placeholder="<%= _placeholder %>"
+     data-api-base="<%= _baseUrl %>"
+     data-api-key="<%= _apiKey %>"
+     data-allow-create="<%= _allowCreate %>"
+     data-required="<%= _required %>"
+     data-value="<%= _value %>"
+     data-value-label="<%= _valueLabel %>"></div>

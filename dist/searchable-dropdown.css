@@ -1,0 +1,124 @@
+/* =========================================================================
+   searchable-dropdown.css — self-contained, themeable styles.
+
+   THEMING: Everything reads from CSS custom properties with sane fallbacks, so
+   the control looks finished with no host theme. Override any of the --sdd-*
+   variables (globally on :root or scoped to one .sdd) to restyle it, or target
+   the BEM-ish classes directly. Class prefix is `sdd` (matches classPrefix).
+
+   To match an existing app's inputs, the simplest override is:
+     .sdd { --sdd-border: <your border>; --sdd-radius: <your radius>; }
+   ========================================================================= */
+
+.sdd {
+  /* --- theme tokens (override these) --- */
+  --sdd-font:          inherit;
+  --sdd-text:          #0f1821;
+  --sdd-text-muted:    #6b7785;
+  --sdd-bg:            #ffffff;
+  --sdd-surface:       #ffffff;
+  --sdd-hover:         #f1f4f7;
+  --sdd-border:        #cdd5de;
+  --sdd-border-focus:  #3b82f6;
+  --sdd-accent:        #2563eb;
+  --sdd-danger:        #dc2626;
+  --sdd-radius:        8px;
+  --sdd-radius-sm:     6px;
+  --sdd-shadow:        0 8px 28px rgba(15, 24, 33, 0.14);
+  --sdd-input-pad:     10px 12px;
+  --sdd-menu-z:        1500;
+
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  font-family: var(--sdd-font);
+  color: var(--sdd-text);
+}
+
+.sdd--disabled { opacity: 0.6; pointer-events: none; }
+
+.sdd__label { font-size: 0.85rem; font-weight: 600; color: var(--sdd-text-muted); }
+.sdd__req   { color: var(--sdd-danger); }
+
+.sdd__control { position: relative; }
+
+.sdd__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--sdd-input-pad);
+  padding-right: 38px;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--sdd-text);
+  background: var(--sdd-bg);
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius);
+  outline: none;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.sdd__input::placeholder { color: var(--sdd-text-muted); }
+.sdd__input:focus {
+  border-color: var(--sdd-border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sdd-border-focus) 22%, transparent);
+}
+
+.sdd__clear {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  width: 26px; height: 26px;
+  border: 0; background: transparent;
+  color: var(--sdd-text-muted);
+  font-size: 1.35rem; line-height: 1; cursor: pointer;
+  border-radius: var(--sdd-radius-sm);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sdd__clear:hover { background: var(--sdd-hover); color: var(--sdd-text); }
+.sdd__clear[hidden] { display: none; }
+
+/* Dropdown menu. */
+.sdd__menu {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  z-index: var(--sdd-menu-z);
+  max-height: 320px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--sdd-surface);
+  border: 1px solid var(--sdd-border);
+  border-radius: var(--sdd-radius-sm);
+  box-shadow: var(--sdd-shadow);
+  padding: 6px;
+}
+.sdd__menu[hidden] { display: none; }
+
+/* Each option: large, left-aligned, two-line tap target (touch-friendly). */
+.sdd__opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  width: 100%; text-align: left; min-height: 42px;
+  padding: 8px 12px;
+  border: 0; background: transparent; color: var(--sdd-text);
+  cursor: pointer; border-radius: var(--sdd-radius-sm);
+  font: inherit; font-size: 1rem;
+}
+.sdd__opt:hover,
+.sdd__opt--active { background: var(--sdd-hover); }
+
+.sdd__opt--create {
+  color: var(--sdd-accent); font-weight: 600;
+  flex-direction: row; align-items: center; gap: 8px;
+}
+
+.sdd__opt-label { font-weight: 600; }
+.sdd__opt-sub   { font-size: 0.82rem; color: var(--sdd-text-muted); }
+
+.sdd__msg   { padding: 10px 12px; color: var(--sdd-text-muted); font-size: 0.92rem; }
+.sdd__error { color: var(--sdd-danger); font-size: 0.82rem; }
+.sdd__error[hidden] { display: none; }
+
+/* Optional dark theme: add class `sdd--dark` (or override the tokens yourself). */
+.sdd--dark {
+  --sdd-text:        #e6edf3;
+  --sdd-text-muted:  #8b98a5;
+  --sdd-bg:          #0f1821;
+  --sdd-surface:     #16212c;
+  --sdd-hover:       #1f2c39;
+  --sdd-border:      #2b3947;
+  --sdd-shadow:      0 8px 28px rgba(0, 0, 0, 0.5);
+}
