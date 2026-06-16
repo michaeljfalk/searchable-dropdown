@@ -42,10 +42,11 @@ import SearchableDropdown from './dist/searchable-dropdown.mjs';
 
 ## Consuming it in another project
 
-This repo is **private** and **not published to npm**, so
-`npm install searchable-dropdown` (public registry) won't find it. Pick whichever
-of these fits the consuming project — a plain `git pull`/clone is enough, there's
-nothing to build for the component itself.
+This repo is **public on GitHub** but **not published to the npm registry**, so
+`npm install searchable-dropdown` (public registry) won't find it — install from
+GitHub instead (Option 2). Pick whichever of these fits the consuming project — a
+plain `git pull`/clone is enough, there's nothing to build for the component
+itself.
 
 > The only thing a host app needs to install is its own `express` + `mongodb`
 > **if** you use the MongoDB server helper (`server/searchable-dropdown-mongo.js`).
@@ -68,8 +69,7 @@ done
 ### Option 2 — `npm install` straight from GitHub (best for bundler apps)
 
 `package.json` declares `main`/`module`/`exports`/`files`, so npm can install it
-directly from the git repo — no registry required (it clones over your existing
-GitHub/SSH auth):
+directly from the public GitHub repo — no registry or auth required:
 
 ```bash
 npm install github:michaeljfalk/searchable-dropdown
