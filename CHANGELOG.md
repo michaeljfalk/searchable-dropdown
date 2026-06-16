@@ -3,6 +3,31 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] - 2026-06-16
+
+### Changed (breaking)
+- **Renamed the exported class / global `SearchableDropdown` → `LiveSelect`.**
+  Update call sites: `new LiveSelect(...)`, `LiveSelect.enhance(...)`,
+  `LiveSelect.remoteSource(...)`, and `window.LiveSelect` for the script-tag
+  global. There is no backward-compatible alias.
+- **Renamed the server router factory `createSearchableDropdownRouter` →
+  `createLiveSelectRouter`** and the auto-mount global
+  `SearchableDropdownAuto` → `LiveSelectAuto`.
+- **Renamed the distributed files** for brand consistency:
+  - `dist/searchable-dropdown.js` → `dist/liveselect.js`
+  - `dist/searchable-dropdown.mjs` → `dist/liveselect.mjs`
+  - `dist/searchable-dropdown.css` → `dist/liveselect.css`
+  - `dist/searchable-dropdown-auto.js` → `dist/liveselect-auto.js`
+  - `server/searchable-dropdown-mongo.js` → `server/liveselect-mongo.js`
+
+  Package consumers importing `@michaeljfalk/liveselect` (and its `/css`,
+  `/auto`, `/server` subpaths) are unaffected — the `exports` map is updated.
+  Script-tag / copy-the-file users must update their `src`/`href` paths.
+
+### Unchanged
+- The CSS class prefix (`sdd`) and the `sdd:change` event name are kept, so
+  existing stylesheets and event listeners continue to work.
+
 ## [1.0.0] - 2026-06-16
 
 First public release — a framework-agnostic, dependency-free searchable dropdown
@@ -36,4 +61,5 @@ First public release — a framework-agnostic, dependency-free searchable dropdo
   MongoDB) covering the audited security guarantees. CI on Node 18/20/22.
 - Documentation: `README.md`, `IMPLEMENTATION.md`, `SECURITY.md`.
 
+[2.0.0]: https://github.com/michaeljfalk/liveselect/releases/tag/v2.0.0
 [1.0.0]: https://github.com/michaeljfalk/liveselect/releases/tag/v1.0.0

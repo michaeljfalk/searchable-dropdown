@@ -21,9 +21,9 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Syntax check distributables
         run: |
-          node --check dist/searchable-dropdown.js
-          node --check dist/searchable-dropdown-auto.js
-          node --check dist/searchable-dropdown.mjs
-          node --check server/searchable-dropdown-mongo.js
+          node --check dist/liveselect.js
+          node --check dist/liveselect-auto.js
+          node --check dist/liveselect.mjs
+          node --check server/liveselect-mongo.js
       - name: Run tests
         run: npm test

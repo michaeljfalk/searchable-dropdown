@@ -1,7 +1,7 @@
 # Implementation guide
 
-How to drop `searchable-dropdown` into each environment. Every target uses the
-**same** `dist/searchable-dropdown.js` + `dist/searchable-dropdown.css` — only
+How to drop `liveselect` into each environment. Every target uses the
+**same** `dist/liveselect.js` + `dist/liveselect.css` — only
 the way you mount it differs.
 
 - [1. Plain HTML + vanilla JS](#1-plain-html--vanilla-js)
@@ -18,14 +18,14 @@ the way you mount it differs.
 ## 1. Plain HTML + vanilla JS
 
 ```html
-<link rel="stylesheet" href="/dist/searchable-dropdown.css">
+<link rel="stylesheet" href="/dist/liveselect.css">
 <form id="f">
   <div id="picker"></div>
   <button type="submit">Save</button>
 </form>
-<script src="/dist/searchable-dropdown.js"></script>
+<script src="/dist/liveselect.js"></script>
 <script>
-  new SearchableDropdown('#picker', {
+  new LiveSelect('#picker', {
     name: 'fruit',                    // a hidden <input name="fruit"> is created
     label: 'Fruit',
     source: [{ value: 'apple', label: 'Apple' }, 'banana', 'cherry'],
@@ -47,7 +47,7 @@ Upgrade an existing select with **no markup changes** — handy for making a who
 form's inputs look uniform:
 
 ```js
-SearchableDropdown.enhance('#country', { allowCreate: false });
+LiveSelect.enhance('#country', { allowCreate: false });
 ```
 
 `enhance()` reads the `<option>`s into an array source, copies
@@ -94,7 +94,7 @@ Customize the row text with `createLabel: (q) => '+ New customer “' + q + '”
 ## 4. MongoDB data source (Node/Express)
 
 The server backend lives in
-[`server/searchable-dropdown-mongo.js`](./server/searchable-dropdown-mongo.js).
+[`server/liveselect-mongo.js`](./server/liveselect-mongo.js).
 It exposes a **registry** and an Express **router** with three routes per key:
 
 ```
@@ -108,8 +108,8 @@ POST /:key/create   { fields, scope }   → option   (201)
 ```js
 const express = require('express');
 const { MongoClient } = require('mongodb');
-const { registerEntry, createSearchableDropdownRouter } =
-  require('./server/searchable-dropdown-mongo');
+const { registerEntry, createLiveSelectRouter } =
+  require('./server/liveselect-mongo');
 
 const db = (await new MongoClient(process.env.MONGO_URL).connect()).db('app');
 
@@ -130,7 +130,7 @@ registerEntry('customers', {
 
 const app = express();
 app.use(express.json());
-app.use('/api/dropdown', createSearchableDropdownRouter({
+app.use('/api/dropdown', createLiveSelectRouter({
   authorize: requireLogin,  // your auth middleware — runs on every route
 }));
 ```
@@ -138,8 +138,8 @@ app.use('/api/dropdown', createSearchableDropdownRouter({
 ### Client side
 
 ```js
-const api = SearchableDropdown.remoteSource({ baseUrl: '/api/dropdown', key: 'customers', create: true });
-new SearchableDropdown('#customer', {
+const api = LiveSelect.remoteSource({ baseUrl: '/api/dropdown', key: 'customers', create: true });
+new LiveSelect('#customer', {
   name: 'customerId', source: api.source, resolve: api.resolve,
   allowCreate: true, onCreate: api.onCreate,
 });
@@ -162,9 +162,9 @@ auto-mount helper reads:
 
 ```html
 <!-- once on the page -->
-<link rel="stylesheet" href="/dist/searchable-dropdown.css">
-<script src="/dist/searchable-dropdown.js"></script>
-<script src="/dist/searchable-dropdown-auto.js"></script>
+<link rel="stylesheet" href="/dist/liveselect.css">
+<script src="/dist/liveselect.js"></script>
+<script src="/dist/liveselect-auto.js"></script>
 
 <!-- anywhere, via the partial -->
 <%- include('_dropdown', {
@@ -196,7 +196,7 @@ Use the adapter in [`examples/blaze/`](./examples/blaze/). It mounts the vanilla
 class in `onRendered`, so Blaze never reimplements the picker:
 
 ```handlebars
-{{> searchableDropdown
+{{> liveSelect
       name="customerId" label="Customer"
       collectionKey="customers" allowCreate=true
       onSelect=onCustomerSelect }}
@@ -204,14 +204,14 @@ class in `onRendered`, so Blaze never reimplements the picker:
 
 Provide a reactive `options` array for a local source, or a `collectionKey` to
 back it with Meteor methods (`<key>.search` / `<key>.option`). Vendor
-`dist/searchable-dropdown.js` somewhere importable and load the `.css` once.
+`dist/liveselect.js` somewhere importable and load the `.css` once.
 
 ---
 
 ## 7. Theming to match your app
 
 Everything reads from `--sdd-*` custom properties (see the top of
-`searchable-dropdown.css`). The fastest path to "matches our other inputs":
+`liveselect.css`). The fastest path to "matches our other inputs":
 
 ```css
 .sdd {
@@ -257,7 +257,7 @@ Enforced by the Express backend:
   `__proto__`/`prototype`/`constructor`.
 - **Bring your own auth, CSRF, and rate limiting** — the router ships with none
   of these (they're app-wide concerns):
-  - pass an `authorize` middleware to `createSearchableDropdownRouter`. Without
+  - pass an `authorize` middleware to `createLiveSelectRouter`. Without
     it (and without `tenantFilter`), the whole collection is searchable by
     anyone — opt into protection deliberately.
   - protect the state-changing `POST /create` with your CSRF strategy (the demo

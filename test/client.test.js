@@ -13,7 +13,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-let SearchableDropdown;
+let LiveSelect;
 let domAvailable = true;
 try {
   const { JSDOM } = require('jsdom');
@@ -24,7 +24,7 @@ try {
   global.Event = dom.window.Event;
   // NB: don't assign global.navigator — it's read-only on Node 20+ and the
   // control doesn't use it.
-  SearchableDropdown = require('../dist/searchable-dropdown.js');
+  LiveSelect = require('../dist/liveselect.js');
 } catch (e) {
   domAvailable = false;
   // eslint-disable-next-line no-console
@@ -38,16 +38,16 @@ function mount() {
 }
 
 test('normalizeOption coerces strings and id/name shapes', { skip: !domAvailable }, () => {
-  assert.deepEqual(SearchableDropdown.normalizeOption('apple'),
+  assert.deepEqual(LiveSelect.normalizeOption('apple'),
     { value: 'apple', label: 'apple', sublabel: '', raw: 'apple' });
-  const n = SearchableDropdown.normalizeOption({ _id: 'x1', name: 'Acme' });
+  const n = LiveSelect.normalizeOption({ _id: 'x1', name: 'Acme' });
   assert.equal(n.value, 'x1');
   assert.equal(n.label, 'Acme');
 });
 
 test('menu escapes HTML in labels/sublabels (no XSS injection)', { skip: !domAvailable }, () => {
   const host = mount();
-  const dd = new SearchableDropdown(host, {
+  const dd = new LiveSelect(host, {
     source: [{ value: '1', label: '<img src=x onerror="alert(1)">', sublabel: '<b>x</b>' }],
   });
   dd.query = '';
@@ -67,7 +67,7 @@ test('hidden input mirrors selected value and sdd:change bubbles', { skip: !domA
   let detail = null;
   host.addEventListener('sdd:change', (e) => { detail = e.detail; });
 
-  const dd = new SearchableDropdown(host, {
+  const dd = new LiveSelect(host, {
     name: 'fruit',
     source: [{ value: 'apple', label: 'Apple' }],
   });
@@ -92,7 +92,7 @@ test('enhance() removes required from the hidden <select> (focusability bug)', {
   sel.innerHTML = '<option value="">Choose…</option><option value="ca">Canada</option>';
   host.appendChild(sel);
 
-  const dd = SearchableDropdown.enhance(sel);
+  const dd = LiveSelect.enhance(sel);
 
   assert.equal(sel.required, false, 'required dropped so a hidden control cannot block submit');
   assert.equal(sel.style.display, 'none', 'original select hidden');
@@ -114,7 +114,7 @@ test('enhance() can create a brand-new option and reflect it into the select', {
   sel.innerHTML = '<option value="">Choose…</option>';
   host.appendChild(sel);
 
-  const dd = SearchableDropdown.enhance(sel);
+  const dd = LiveSelect.enhance(sel);
   dd._select({ value: 'yyz', label: 'Toronto', sublabel: '' }); // value not originally in select
   assert.equal(sel.value, 'yyz');
   assert.ok(Array.prototype.some.call(sel.options, (o) => o.value === 'yyz'));

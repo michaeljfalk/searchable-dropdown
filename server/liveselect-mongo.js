@@ -1,7 +1,7 @@
 /**
- * searchable-dropdown-mongo.js — security-hardened Express + MongoDB backend.
+ * liveselect-mongo.js — security-hardened Express + MongoDB backend.
  *
- * WHAT: A small registry + Express router that powers the SearchableDropdown
+ * WHAT: A small registry + Express router that powers the LiveSelect
  *       control's async source. Three routes per registered key:
  *         GET  /:key/search?q=&limit=&scope[x]=   → live, scoped search
  *         GET  /:key/option/:id                   → resolve one id → option
@@ -191,7 +191,7 @@ function readScopeFromQuery(query) {
 }
 
 /**
- * createSearchableDropdownRouter — build an Express Router with the three
+ * createLiveSelectRouter — build an Express Router with the three
  * routes wired to the registry.
  *
  * @param {object} [opts]
@@ -199,7 +199,7 @@ function readScopeFromQuery(query) {
  * @param {function} [opts.authorize] — (req, res, next) middleware run on every route
  * @returns {import('express').Router}
  */
-function createSearchableDropdownRouter(opts = {}) {
+function createLiveSelectRouter(opts = {}) {
   // Lazy require so the client side never needs express installed.
   const Router = opts.Router || require('express').Router;
   const router = Router();
@@ -235,7 +235,7 @@ function createSearchableDropdownRouter(opts = {}) {
 
       res.json(docs.map((d) => toOption(entry, d)));
     } catch (err) {
-      console.error('[searchable-dropdown] search failed for key=%s:', safeForLog(req.params.key), err);
+      console.error('[liveselect] search failed for key=%s:', safeForLog(req.params.key), err);
       res.status(500).json({ error: 'Search failed.' });
     }
   });
@@ -259,7 +259,7 @@ function createSearchableDropdownRouter(opts = {}) {
       const doc = await entry.collection.findOne(selector, findOptions(entry));
       res.json(doc ? toOption(entry, doc) : null);
     } catch (err) {
-      console.error('[searchable-dropdown] option lookup failed for key=%s:', safeForLog(req.params.key), err);
+      console.error('[liveselect] option lookup failed for key=%s:', safeForLog(req.params.key), err);
       res.status(500).json({ error: 'Lookup failed.' });
     }
   });
@@ -309,7 +309,7 @@ function createSearchableDropdownRouter(opts = {}) {
       const fresh = await entry.collection.findOne(setField({}, idField, id), findOptions(entry));
       res.status(201).json(toOption(entry, fresh || setField({ ...doc }, idField, id)));
     } catch (err) {
-      console.error('[searchable-dropdown] create failed for key=%s:', safeForLog(req.params.key), err);
+      console.error('[liveselect] create failed for key=%s:', safeForLog(req.params.key), err);
       res.status(500).json({ error: 'Create failed.' });
     }
   });
@@ -321,7 +321,7 @@ module.exports = {
   registerEntry,
   getEntry,
   toOption,
-  createSearchableDropdownRouter,
+  createLiveSelectRouter,
   // exported for testing / reuse
   _internal: { escapeRegExp, getByPath, applyScope, setField, assertSafeField },
 };

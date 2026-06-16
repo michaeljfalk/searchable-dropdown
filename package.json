@@ -1,6 +1,6 @@
 {
   "name": "@michaeljfalk/liveselect",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "publishConfig": {
     "access": "public"
   },
@@ -8,16 +8,16 @@
   "scripts": {
     "test": "node --test"
   },
-  "main": "dist/searchable-dropdown.js",
-  "module": "dist/searchable-dropdown.mjs",
+  "main": "dist/liveselect.js",
+  "module": "dist/liveselect.mjs",
   "exports": {
     ".": {
-      "import": "./dist/searchable-dropdown.mjs",
-      "require": "./dist/searchable-dropdown.js"
+      "import": "./dist/liveselect.mjs",
+      "require": "./dist/liveselect.js"
     },
-    "./css": "./dist/searchable-dropdown.css",
-    "./auto": "./dist/searchable-dropdown-auto.js",
-    "./server": "./server/searchable-dropdown-mongo.js"
+    "./css": "./dist/liveselect.css",
+    "./auto": "./dist/liveselect-auto.js",
+    "./server": "./server/liveselect-mongo.js"
   },
   "files": [
     "dist/",
@@ -39,8 +39,8 @@
     "blaze"
   ],
   "sideEffects": [
-    "dist/searchable-dropdown.js",
-    "dist/searchable-dropdown-auto.js"
+    "dist/liveselect.js",
+    "dist/liveselect-auto.js"
   ],
   "license": "MIT",
   "devDependencies": {

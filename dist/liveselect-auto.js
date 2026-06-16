@@ -1,5 +1,5 @@
 /**
- * searchable-dropdown-auto.js — declarative auto-mount helper (optional).
+ * liveselect-auto.js — declarative auto-mount helper (optional).
  *
  * WHAT: Lets server templates (EJS, Blaze, plain HTML) create a dropdown with
  *       NO inline JavaScript — you just render a <div> with data-* attributes
@@ -7,7 +7,7 @@
  *       server data into <script> tags (an XSS footgun) entirely: all values
  *       travel as HTML-escaped attributes and are read back via dataset.
  *
- * LOAD ORDER: include searchable-dropdown.js first, then this file.
+ * LOAD ORDER: include liveselect.js first, then this file.
  *
  * MARKUP:
  *   <div data-sdd-mount
@@ -23,7 +23,7 @@
  *   ></div>
  *
  * Provide EITHER data-api-base + data-api-key (remote) OR data-options (array).
- * Each mounted element gets `el._sdd` set to its SearchableDropdown instance.
+ * Each mounted element gets `el._sdd` set to its LiveSelect instance.
  */
 (function () {
   'use strict';
@@ -32,8 +32,8 @@
 
   function mountOne(el) {
     if (el._sdd) return; // already mounted
-    var SD = (typeof self !== 'undefined' ? self : window).SearchableDropdown;
-    if (!SD) { if (typeof console !== 'undefined') console.error('searchable-dropdown.js must load before -auto.js'); return; }
+    var SD = (typeof self !== 'undefined' ? self : window).LiveSelect;
+    if (!SD) { if (typeof console !== 'undefined') console.error('liveselect.js must load before -auto.js'); return; }
 
     var d = el.dataset;
     var opts = {
@@ -77,5 +77,5 @@
   }
 
   // Expose for dynamic content (e.g. after AJAX inserts new markup).
-  (typeof self !== 'undefined' ? self : window).SearchableDropdownAuto = { mountAll: mountAll, mountOne: mountOne };
+  (typeof self !== 'undefined' ? self : window).LiveSelectAuto = { mountAll: mountAll, mountOne: mountOne };
 }());

@@ -21,9 +21,9 @@ const express = require('express');
 const {
   registerEntry,
   toOption,
-  createSearchableDropdownRouter,
+  createLiveSelectRouter,
   _internal,
-} = require('../server/searchable-dropdown-mongo.js');
+} = require('../server/liveselect-mongo.js');
 
 // --------------------------------------------------------------------------
 // Pure-function unit tests (no Mongo needed)
@@ -94,7 +94,7 @@ test('search returns a generic error and never leaks internal messages', async (
   });
   const app = express(); // nosemgrep -- ephemeral in-process test harness, not a network-facing server
   app.use(express.json());
-  app.use('/d', createSearchableDropdownRouter({ Router: express.Router }));
+  app.use('/d', createLiveSelectRouter({ Router: express.Router }));
 
   const { server, port } = await listen(app);
   try {
@@ -158,7 +158,7 @@ test('router against in-memory MongoDB', async (t) => {
 
   const app = express(); // nosemgrep -- ephemeral in-process test harness, not a network-facing server
   app.use(express.json());
-  app.use('/d', createSearchableDropdownRouter({ Router: express.Router }));
+  app.use('/d', createLiveSelectRouter({ Router: express.Router }));
   const { server, port } = await listen(app);
   const base = `http://127.0.0.1:${port}/d`;
   const get = async (u) => (await fetch(base + u)).json();

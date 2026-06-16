@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SearchableDropdown — vanilla demo</title>
+  <title>LiveSelect — vanilla demo</title>
 
   <!-- 1. The stylesheet (themeable via --sdd-* custom properties). -->
-  <link rel="stylesheet" href="../dist/searchable-dropdown.css">
+  <link rel="stylesheet" href="../dist/liveselect.css">
 
   <style>
     body { font-family: system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; color: #0f1821; }
@@ -19,7 +19,7 @@
   </style>
 </head>
 <body>
-  <h1>SearchableDropdown</h1>
+  <h1>LiveSelect</h1>
   <p>One dependency-free control: searchable, keyboard-navigable, <code>[+ Add new]</code>, and a drop-in <code>&lt;select&gt;</code> replacement.</p>
 
   <!-- ===== 1. Array source + Add-new ===== -->
@@ -45,8 +45,8 @@
   </select>
   <div class="out" id="out3">native select value: (none)</div>
 
-  <!-- 2. The script — exposes window.SearchableDropdown. -->
-  <script src="../dist/searchable-dropdown.js"></script>
+  <!-- 2. The script — exposes window.LiveSelect. -->
+  <script src="../dist/liveselect.js"></script>
   <script>
     var fruits = [
       { value: 'apple',  label: 'Apple',  sublabel: 'Pomaceous' },
@@ -57,7 +57,7 @@
     ];
 
     // 1 · Array source + create flow.
-    var dd1 = new SearchableDropdown('#picker1', {
+    var dd1 = new LiveSelect('#picker1', {
       name: 'fruit',
       label: 'Favourite fruit',
       placeholder: 'Search fruit…',
@@ -89,14 +89,14 @@
     });
 
     // 2 · Same data, restyled.
-    new SearchableDropdown('#picker2', { label: 'Themed picker', source: fruits });
+    new LiveSelect('#picker2', { label: 'Themed picker', source: fruits });
 
     // 3 · Enhance the native <select> — existing change listeners keep working.
     var nativeSel = document.getElementById('native');
     nativeSel.addEventListener('change', function () {
       document.getElementById('out3').textContent = 'native select value: ' + JSON.stringify(nativeSel.value);
     });
-    SearchableDropdown.enhance('#native', { allowCreate: false });
+    LiveSelect.enhance('#native', { allowCreate: false });
   </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 /**
  * examples/express-mongo/server.js — end-to-end demo.
  *
- * Wires the SearchableDropdown control to a real MongoDB collection through the
+ * Wires the LiveSelect control to a real MongoDB collection through the
  * security-hardened router, and renders the page with an EJS template.
  *
  *   npm install express mongodb ejs
@@ -19,8 +19,8 @@ const { MongoClient } = require('mongodb');
 
 const {
   registerEntry,
-  createSearchableDropdownRouter,
-} = require('../../server/searchable-dropdown-mongo');
+  createLiveSelectRouter,
+} = require('../../server/liveselect-mongo');
 
 const DB_NAME = process.env.DB_NAME || 'sdd_demo';
 const PORT    = process.env.PORT    || 3000;
@@ -137,11 +137,11 @@ async function main() {
   // The dropdown API. We pass `Router` explicitly because in this example the
   // library lives in a sibling folder that can't resolve express on its own;
   // when you copy server/ into your own app (where express is installed) you can
-  // drop this and just call createSearchableDropdownRouter({ authorize }).
+  // drop this and just call createLiveSelectRouter({ authorize }).
   app.use(
     '/api/dropdown',
     sameOriginGuard,
-    createSearchableDropdownRouter({ Router: express.Router /* , authorize: requireLogin */ }),
+    createLiveSelectRouter({ Router: express.Router /* , authorize: requireLogin */ }),
   );
 
   app.get('/', (req, res) => res.render('index'));

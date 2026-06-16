@@ -22,7 +22,7 @@ is available we'll credit you (unless you prefer otherwise) in the release notes
 The browser control escapes all data-derived content it renders (option labels,
 sublabels, the typed query, messages) and never injects untrusted HTML.
 
-The MongoDB/Express backend (`server/searchable-dropdown-mongo.js`) enforces:
+The MongoDB/Express backend (`server/liveselect-mongo.js`) enforces:
 
 - registry-gated access — the client sends a **key**, never a collection or
   field name; unknown keys → 404;

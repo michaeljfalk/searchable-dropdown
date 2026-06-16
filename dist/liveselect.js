@@ -1,5 +1,5 @@
 /**
- * searchable-dropdown.js — framework-agnostic, dependency-free combobox.
+ * liveselect.js — framework-agnostic, dependency-free combobox.
  *
  * WHAT: One control that replaces a normal <select> with a searchable,
  *       keyboard-navigable dropdown. It can read options from a plain array OR
@@ -16,11 +16,11 @@
  *       uncontrolled (you omit it and listen for changes).
  *
  * USAGE (script tag):
- *       <script src="searchable-dropdown.js"></script>
- *       new SearchableDropdown('#picker', { source: [...] });
+ *       <script src="liveselect.js"></script>
+ *       new LiveSelect('#picker', { source: [...] });
  *
  * USAGE (ES module / bundler):
- *       import SearchableDropdown from './searchable-dropdown.mjs';
+ *       import LiveSelect from './liveselect.mjs';
  *
  * OPTIONS (all optional unless noted):
  *   source        (required) Array<option|string> OR
@@ -57,7 +57,7 @@
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) define([], factory);
   else if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.SearchableDropdown = factory();
+  else root.LiveSelect = factory();
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
@@ -114,9 +114,9 @@
 
   // ---- class ---------------------------------------------------------------
 
-  function SearchableDropdown(elementOrSelector, options) {
+  function LiveSelect(elementOrSelector, options) {
     var host = resolveEl(elementOrSelector);
-    if (!host) throw new Error('SearchableDropdown: mount element not found.');
+    if (!host) throw new Error('LiveSelect: mount element not found.');
 
     this.opts = options || {};
     this.host = host;
@@ -147,13 +147,13 @@
     }
   }
 
-  SearchableDropdown.prototype._c = function (suffix) {
+  LiveSelect.prototype._c = function (suffix) {
     return suffix ? this.cp + '__' + suffix : this.cp;
   };
 
   // -- DOM construction ------------------------------------------------------
 
-  SearchableDropdown.prototype._build = function () {
+  LiveSelect.prototype._build = function () {
     var cp = this.cp;
     var o  = this.opts;
 
@@ -194,7 +194,7 @@
 
   // -- event binding ---------------------------------------------------------
 
-  SearchableDropdown.prototype._bind = function () {
+  LiveSelect.prototype._bind = function () {
     var self = this;
 
     this._onInput = function (e) {
@@ -238,13 +238,13 @@
 
   // -- searching -------------------------------------------------------------
 
-  SearchableDropdown.prototype._scheduleSearch = function () {
+  LiveSelect.prototype._scheduleSearch = function () {
     var self = this;
     if (this._debounce) clearTimeout(this._debounce);
     this._debounce = setTimeout(function () { self._runSearch(); }, this.opts.debounce != null ? this.opts.debounce : 250);
   };
 
-  SearchableDropdown.prototype._runSearch = function () {
+  LiveSelect.prototype._runSearch = function () {
     var self  = this;
     var q     = this.query.trim();
     var limit = this.opts.limit || 20;
@@ -307,7 +307,7 @@
 
   // -- create row ------------------------------------------------------------
 
-  SearchableDropdown.prototype._canCreate = function () {
+  LiveSelect.prototype._canCreate = function () {
     if (!this.opts.allowCreate || typeof this.opts.onCreate !== 'function') return false;
     var q = this.query.trim();
     if (!q) return false;
@@ -318,7 +318,7 @@
     return !exact;
   };
 
-  SearchableDropdown.prototype._openCreate = function () {
+  LiveSelect.prototype._openCreate = function () {
     var self = this;
     var q = this.query.trim();
     var ctx = { scope: this.opts.scope || {}, query: q };
@@ -336,7 +336,7 @@
 
   // -- keyboard --------------------------------------------------------------
 
-  SearchableDropdown.prototype._handleKeydown = function (e) {
+  LiveSelect.prototype._handleKeydown = function (e) {
     var canCreate = this._canCreate();
     var max = this.results.length + (canCreate ? 1 : 0) - 1;
 
@@ -366,7 +366,7 @@
 
   // -- selection / value -----------------------------------------------------
 
-  SearchableDropdown.prototype._select = function (opt) {
+  LiveSelect.prototype._select = function (opt) {
     this.selected = opt;
     this.query = '';
     this._setOpen(false);
@@ -377,7 +377,7 @@
     this._emit(opt);
   };
 
-  SearchableDropdown.prototype._emit = function (opt) {
+  LiveSelect.prototype._emit = function (opt) {
     var value = opt ? opt.value : '';
     if (typeof this.opts.onChange === 'function') {
       try { this.opts.onChange(value, opt || null); } catch (e) { /* swallow */ }
@@ -390,7 +390,7 @@
 
   // -- rendering -------------------------------------------------------------
 
-  SearchableDropdown.prototype._setOpen = function (open) {
+  LiveSelect.prototype._setOpen = function (open) {
     this.isOpen = open;
     this.root.classList.toggle(this.cp + '--open', open);
     this.input.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -404,26 +404,26 @@
     }
   };
 
-  SearchableDropdown.prototype._syncInput = function () {
+  LiveSelect.prototype._syncInput = function () {
     if (this.isOpen) { this.input.value = this.query; return; }
     this.input.value = this.selected ? this.selected.label : '';
     this.input.placeholder = this.opts.placeholder || 'Search…';
     this.clearEl.hidden = !(this.selected && this.opts.clearable !== false && !this.opts.disabled);
   };
 
-  SearchableDropdown.prototype._syncHidden = function () {
+  LiveSelect.prototype._syncHidden = function () {
     this.hidden.value = this.selected ? this.selected.value : '';
     this.clearEl.hidden = !(this.selected && this.opts.clearable !== false && !this.opts.disabled);
     // Fire a native change so plain-form listeners / validators react.
     this.hidden.dispatchEvent(new Event('change', { bubbles: true }));
   };
 
-  SearchableDropdown.prototype._renderError = function () {
+  LiveSelect.prototype._renderError = function () {
     this.errorEl.textContent = this.error || '';
     this.errorEl.hidden = !this.error;
   };
 
-  SearchableDropdown.prototype._renderMenu = function () {
+  LiveSelect.prototype._renderMenu = function () {
     var cp = this.cp;
     if (!this.isOpen) { this.menu.hidden = true; return; }
 
@@ -462,16 +462,16 @@
   // -- public API ------------------------------------------------------------
 
   /** Current selected value (the string that submits in a form). */
-  SearchableDropdown.prototype.getValue = function () { return this.selected ? this.selected.value : ''; };
+  LiveSelect.prototype.getValue = function () { return this.selected ? this.selected.value : ''; };
 
   /** Current selected option object, or null. */
-  SearchableDropdown.prototype.getOption = function () { return this.selected; };
+  LiveSelect.prototype.getOption = function () { return this.selected; };
 
   /**
    * setValue — select by value. Pass `option` to set the label without a lookup;
    * otherwise we try the array source, then opts.resolve, to find the label.
    */
-  SearchableDropdown.prototype.setValue = function (value, option) {
+  LiveSelect.prototype.setValue = function (value, option) {
     var self = this;
     var v = value == null ? '' : String(value);
     this._appliedValue = v;
@@ -499,7 +499,7 @@
     this._syncHidden();
   };
 
-  SearchableDropdown.prototype.clear = function () {
+  LiveSelect.prototype.clear = function () {
     this.selected = null;
     this.query = '';
     this.results = [];
@@ -511,31 +511,31 @@
     this.input.focus();
   };
 
-  SearchableDropdown.prototype.focus = function () { this.input.focus(); };
-  SearchableDropdown.prototype.open  = function () { this.input.focus(); this._setOpen(true); };
-  SearchableDropdown.prototype.close = function () { this._setOpen(false); this._syncInput(); };
+  LiveSelect.prototype.focus = function () { this.input.focus(); };
+  LiveSelect.prototype.open  = function () { this.input.focus(); this._setOpen(true); };
+  LiveSelect.prototype.close = function () { this._setOpen(false); this._syncInput(); };
 
   /** Swap the data source (e.g. after pushing a new item to an array). */
-  SearchableDropdown.prototype.setSource = function (source) {
+  LiveSelect.prototype.setSource = function (source) {
     this.opts.source = source;
     if (this.isOpen) this._runSearch();
   };
 
   /** Update the parent-scope filter passed to async source / onCreate. */
-  SearchableDropdown.prototype.setScope = function (scope) {
+  LiveSelect.prototype.setScope = function (scope) {
     this.opts.scope = scope || {};
     this.results = [];
     if (this.isOpen) this._runSearch();
   };
 
-  SearchableDropdown.prototype.setDisabled = function (disabled) {
+  LiveSelect.prototype.setDisabled = function (disabled) {
     this.opts.disabled = !!disabled;
     this.input.disabled = !!disabled;
     this.root.classList.toggle(this.cp + '--disabled', !!disabled);
     this.clearEl.hidden = !(this.selected && this.opts.clearable !== false && !disabled);
   };
 
-  SearchableDropdown.prototype.destroy = function () {
+  LiveSelect.prototype.destroy = function () {
     clearTimeout(this._debounce);
     clearTimeout(this._blurTimer);
     this.input.removeEventListener('input', this._onInput);
@@ -550,7 +550,7 @@
   // -- static: enhance an existing <select> ----------------------------------
 
   /**
-   * enhance — progressively replace a native <select> with a SearchableDropdown
+   * enhance — progressively replace a native <select> with a LiveSelect
    * so existing forms get the uniform look with zero markup changes.
    *
    * It reads the <option>s into an array source, copies name/value/required/
@@ -558,12 +558,12 @@
    * on change — so any code already listening to the <select> keeps working.
    *
    * @param {HTMLSelectElement|string} selectElOrSelector
-   * @param {object} [extra] — extra SearchableDropdown options (allowCreate, etc.)
-   * @returns {SearchableDropdown}
+   * @param {object} [extra] — extra LiveSelect options (allowCreate, etc.)
+   * @returns {LiveSelect}
    */
-  SearchableDropdown.enhance = function (selectElOrSelector, extra) {
+  LiveSelect.enhance = function (selectElOrSelector, extra) {
     var sel = resolveEl(selectElOrSelector);
-    if (!sel || sel.tagName !== 'SELECT') throw new Error('SearchableDropdown.enhance: a <select> is required.');
+    if (!sel || sel.tagName !== 'SELECT') throw new Error('LiveSelect.enhance: a <select> is required.');
 
     var source = [];
     var initial = '', initialLabel = '';
@@ -616,12 +616,12 @@
     // the same field twice.
     opts.name = '';
 
-    return new SearchableDropdown(mount, opts);
+    return new LiveSelect(mount, opts);
   };
 
   /**
    * remoteSource — build { source, resolve, onCreate } wired to a
-   * searchable-dropdown HTTP endpoint (see server/searchable-dropdown-mongo.js).
+   * liveselect HTTP endpoint (see server/liveselect-mongo.js).
    *
    * @param {object} cfg
    * @param {string} cfg.baseUrl   e.g. '/api/dropdown'
@@ -631,10 +631,10 @@
    * @param {boolean} [cfg.create] also return an onCreate that POSTs to /create
    * @returns {{source:function, resolve:function, onCreate?:function}}
    */
-  SearchableDropdown.remoteSource = function (cfg) {
+  LiveSelect.remoteSource = function (cfg) {
     cfg = cfg || {};
     var f = cfg.fetch || (typeof fetch !== 'undefined' ? fetch.bind(window) : null);
-    if (!f) throw new Error('SearchableDropdown.remoteSource: no fetch available.');
+    if (!f) throw new Error('LiveSelect.remoteSource: no fetch available.');
     var base = cfg.baseUrl.replace(/\/$/, '') + '/' + encodeURIComponent(cfg.key);
     var headers = Object.assign({ 'Content-Type': 'application/json' }, cfg.headers || {});
 
@@ -673,7 +673,7 @@
     return api;
   };
 
-  SearchableDropdown.normalizeOption = normalizeOption;
+  LiveSelect.normalizeOption = normalizeOption;
 
-  return SearchableDropdown;
+  return LiveSelect;
 }));

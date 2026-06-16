@@ -1,12 +1,12 @@
 /**
- * searchableDropdown.js — Blaze adapter for the framework-agnostic control.
+ * liveSelect.js — Blaze adapter for the framework-agnostic control.
  *
- * WHAT: Instantiates the vanilla SearchableDropdown inside a Blaze template and
+ * WHAT: Instantiates the vanilla LiveSelect inside a Blaze template and
  *       bridges Blaze's data context to it. The picker's data can come from:
  *         - a reactive array helper passed as `options`, OR
  *         - a Meteor method via the `methodBase`/`collectionKey` remote source.
  *
- * The same dist/searchable-dropdown.js + .css power this; Blaze only mounts it.
+ * The same dist/liveselect.js + .css power this; Blaze only mounts it.
  *
  * DATA CONTEXT (all optional unless noted):
  *   name           hidden-input name for plain-form usage
@@ -24,9 +24,9 @@ import { Template } from 'meteor/templating';
 import { Meteor } from 'meteor/meteor';
 
 // Adjust the path to wherever you vendor the dist file in your app.
-import SearchableDropdown from '/dist/searchable-dropdown.js';
+import LiveSelect from '/dist/liveselect.js';
 
-import './searchableDropdown.html';
+import './liveSelect.html';
 
 /**
  * meteorSource — back the control with a Meteor method instead of HTTP.
@@ -44,7 +44,7 @@ function meteorSource(collectionKey) {
   };
 }
 
-Template.searchableDropdown.onRendered(function () {
+Template.liveSelect.onRendered(function () {
   const data = Template.currentData() || {};
   const mount = this.find('.sdd-blaze-mount');
 
@@ -69,9 +69,9 @@ Template.searchableDropdown.onRendered(function () {
     opts.source = [];
   }
 
-  this._sdd = new SearchableDropdown(mount, opts);
+  this._sdd = new LiveSelect(mount, opts);
 });
 
-Template.searchableDropdown.onDestroyed(function () {
+Template.liveSelect.onDestroyed(function () {
   if (this._sdd) this._sdd.destroy();
 });

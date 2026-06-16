@@ -2,7 +2,7 @@
   "name": "liveselect-express-mongo-example",
   "private": true,
   "version": "1.0.0",
-  "description": "Express + MongoDB + EJS demo for searchable-dropdown",
+  "description": "Express + MongoDB + EJS demo for liveselect",
   "scripts": {
     "start": "node server.js"
   },

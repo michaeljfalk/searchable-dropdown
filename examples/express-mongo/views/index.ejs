@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SearchableDropdown — Express + MongoDB (EJS)</title>
-  <link rel="stylesheet" href="/dist/searchable-dropdown.css">
+  <title>LiveSelect — Express + MongoDB (EJS)</title>
+  <link rel="stylesheet" href="/dist/liveselect.css">
   <style>
     body { font-family: system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; }
     h2 { font-size: 1rem; margin-top: 32px; }
@@ -36,8 +36,8 @@
   <div class="out" id="outB">value: (none)</div>
 
   <!-- Load once: core, then the optional declarative auto-mount helper. -->
-  <script src="/dist/searchable-dropdown.js"></script>
-  <script src="/dist/searchable-dropdown-auto.js"></script>
+  <script src="/dist/liveselect.js"></script>
+  <script src="/dist/liveselect-auto.js"></script>
   <script>
     // The declarative control (A) reports through the bubbling CustomEvent.
     document.getElementById('formA').addEventListener('sdd:change', function (e) {
@@ -50,8 +50,8 @@
     });
 
     // The imperative control (B) — same data source, built by hand.
-    var api = SearchableDropdown.remoteSource({ baseUrl: '/api/dropdown', key: 'customers', create: true });
-    new SearchableDropdown('#customerPicker', {
+    var api = LiveSelect.remoteSource({ baseUrl: '/api/dropdown', key: 'customers', create: true });
+    new LiveSelect('#customerPicker', {
       name: 'customerId2',
       label: 'Customer',
       placeholder: 'Search customers…',
