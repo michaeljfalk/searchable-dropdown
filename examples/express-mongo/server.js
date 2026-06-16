@@ -22,13 +22,63 @@ const {
   createSearchableDropdownRouter,
 } = require('../../server/searchable-dropdown-mongo');
 
-const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017';
-const DB_NAME   = process.env.DB_NAME   || 'sdd_demo';
-const PORT      = process.env.PORT      || 3000;
+const DB_NAME = process.env.DB_NAME || 'sdd_demo';
+const PORT    = process.env.PORT    || 3000;
+
+/**
+ * connectMongo — return a connected client, with zero-config fallback.
+ *
+ * Order of preference:
+ *   1. process.env.MONGO_URL (your real cluster / local mongod), if reachable.
+ *   2. An in-memory MongoDB via the optional `mongodb-memory-server` dev dep —
+ *      lets the demo run with NOTHING installed (`npm install` pulls it in).
+ * If neither works we exit with a clear, actionable message.
+ */
+async function connectMongo() {
+  const url = process.env.MONGO_URL;
+  if (url) {
+    const client = new MongoClient(url, { serverSelectionTimeoutMS: 2000 });
+    try {
+      await client.connect();
+      console.log(`✓ Connected to MONGO_URL (${url})`);
+      return client;
+    } catch (err) {
+      console.warn(`! Could not reach MONGO_URL (${err.message}). Falling back to in-memory MongoDB…`);
+    }
+  }
+
+  let MongoMemoryServer;
+  try {
+    ({ MongoMemoryServer } = require('mongodb-memory-server'));
+  } catch (e) {
+    console.error(
+      '\nNo MongoDB available.\n' +
+      '  • Start one and set MONGO_URL, e.g.  MONGO_URL="mongodb://localhost:27017" node server.js\n' +
+      '  • Or install the zero-config fallback: npm install   (pulls mongodb-memory-server)\n',
+    );
+    process.exit(1);
+  }
+
+  console.log('… starting in-memory MongoDB (first run downloads a mongod binary)');
+  // The very first run downloads + extracts a mongod binary; that can blow past
+  // the default 10s start window. If so, retry once — the binary is cached by
+  // then, so the second attempt starts in ~1s.
+  let mem;
+  try {
+    mem = await MongoMemoryServer.create();
+  } catch (err) {
+    console.warn(`! First start failed (${err.message}). Retrying now the binary is cached…`);
+    mem = await MongoMemoryServer.create();
+  }
+  const client = new MongoClient(mem.getUri());
+  await client.connect();
+  client.__mem = mem; // keep a handle so it isn't GC'd / can be stopped
+  console.log('✓ In-memory MongoDB ready');
+  return client;
+}
 
 async function main() {
-  const client = new MongoClient(MONGO_URL);
-  await client.connect();
+  const client = await connectMongo();
   const db = client.db(DB_NAME);
   const customers = db.collection('customers');
 
@@ -84,11 +134,14 @@ async function main() {
     return res.status(403).json({ error: 'Cross-origin request rejected.' });
   }
 
-  // The dropdown API. Add an `authorize` middleware in production.
+  // The dropdown API. We pass `Router` explicitly because in this example the
+  // library lives in a sibling folder that can't resolve express on its own;
+  // when you copy server/ into your own app (where express is installed) you can
+  // drop this and just call createSearchableDropdownRouter({ authorize }).
   app.use(
     '/api/dropdown',
     sameOriginGuard,
-    createSearchableDropdownRouter(/* { authorize: requireLogin } */),
+    createSearchableDropdownRouter({ Router: express.Router /* , authorize: requireLogin */ }),
   );
 
   app.get('/', (req, res) => res.render('index'));

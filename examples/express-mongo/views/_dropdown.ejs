@@ -1,26 +1,13 @@
 <%
-/*
- * _dropdown.ejs — reusable EJS partial that renders the control DECLARATIVELY.
- *
- * No inline JavaScript: every value is emitted as an HTML-escaped data-*
- * attribute (via <%= %>), and searchable-dropdown-auto.js mounts it on load.
- * This keeps server data out of <script> tags entirely (no XSS surface).
- *
- * Include it with:
- *   <%- include('_dropdown', {
- *         name: 'customerId',
- *         label: 'Customer',
- *         apiKey: 'customers',                 // registry key on the server
- *         allowCreate: true,
- *         value: customer ? customer._id : '', // optional, edit mode
- *         valueLabel: customer ? customer.name : '',
- *       }) %>
- *
- * Requires on the page (once):
- *   <link rel="stylesheet" href="/dist/searchable-dropdown.css">
- *   <script src="/dist/searchable-dropdown.js"></script>
- *   <script src="/dist/searchable-dropdown-auto.js"></script>
- */
+// _dropdown.ejs — reusable EJS partial that renders the control DECLARATIVELY.
+//
+// No inline JavaScript: every value is emitted as an HTML-escaped data-*
+// attribute, and searchable-dropdown-auto.js mounts it on load. This keeps
+// server data out of script tags entirely (no XSS surface).
+//
+// Usage and the full attribute list are documented in IMPLEMENTATION.md (§5).
+// Locals it accepts: name, label, placeholder, apiKey, baseUrl, allowCreate,
+// value, valueLabel, required. Requires the core js + css + -auto.js on the page.
 const _name        = typeof name        !== 'undefined' ? name        : '';
 const _label       = typeof label       !== 'undefined' ? label       : '';
 const _placeholder = typeof placeholder !== 'undefined' ? placeholder : 'Search…';

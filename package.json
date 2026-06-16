@@ -37,6 +37,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/michaeljfalk/dispatch-select.git"
+    "url": "git+https://github.com/michaeljfalk/searchable-dropdown.git"
   }
 }
