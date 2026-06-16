@@ -1,5 +1,10 @@
 # searchable-dropdown
 
+[![CI](https://github.com/michaeljfalk/searchable-dropdown/actions/workflows/ci.yml/badge.svg)](https://github.com/michaeljfalk/searchable-dropdown/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/michaeljfalk/searchable-dropdown?sort=semver)](https://github.com/michaeljfalk/searchable-dropdown/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./package.json)
+
 A **framework-agnostic, dependency-free** searchable dropdown / combobox — one
 control to replace native `<select>`s so every input looks uniform.
 
