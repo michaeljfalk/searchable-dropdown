@@ -3,6 +3,31 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [3.3.0] - 2026-06-17
+
+### Added
+- **Disabled options.** A per-option `disabled: true` makes a row non-selectable:
+  dimmed, `aria-disabled`, skipped by keyboard navigation, and ignored on click/Enter.
+- **`required` form validation.** Required controls now enforce selection via the
+  Constraint Validation API on the *visible* input, so an empty required control
+  blocks form submit with a focusable, on-screen validation bubble (message via
+  `texts.required`). This also makes `enhance()`’s `required` actually enforce —
+  previously it was dropped because a `display:none` `<select>` isn’t focusable.
+- **Match highlighting.** `highlight: true` wraps the matched query substring in
+  each result’s label/sublabel with `<mark class="liveselect__mark">` (built from
+  text nodes — still XSS-safe). Ignored for `renderOption` rows.
+- **“Showing N of M” footer.** When results are capped by `limit`, a footer shows
+  the count. Array sources compute the total automatically; async sources can
+  return `{ items, total }`. Customize via `texts.more(shown, total)`.
+- **Lifecycle events.** Bubbling `liveselect:open`, `liveselect:close`, and
+  `liveselect:search` ({ query }) CustomEvents, alongside `liveselect:change`.
+- **Async result caching.** `cache: true` memoizes async results by
+  query+scope+limit so repeat queries skip the network. Cleared by
+  `setSource()` / `setScope()`.
+
+### Changed
+- `normalizeOption` output now includes a `disabled` field (`false` when absent).
+
 ## [3.2.0] - 2026-06-17
 
 ### Added

@@ -78,15 +78,17 @@
       { value: 'banana', label: 'Banana', sublabel: 'Berry, technically' },
       { value: 'cherry', label: 'Cherry', sublabel: 'Stone fruit' },
       { value: 'date',   label: 'Date',   sublabel: 'Palm fruit' },
+      { value: 'durian', label: 'Durian', sublabel: 'Out of stock', disabled: true },
       { value: 'fig',    label: 'Fig' },
     ];
 
-    // 1 · Array source + create flow.
+    // 1 · Array source + create flow, with match highlighting + a disabled row.
     var dd1 = new LiveSelect('#picker1', {
       name: 'fruit',
       label: 'Favourite fruit',
       placeholder: 'Search fruit…',
       source: fruits,
+      highlight: true,        // bold the matched substring
       allowCreate: true,
       // onCreate can do ANYTHING. Here we just push to the array and return the
       // new option so it's auto-selected. In a real app you'd POST to a server

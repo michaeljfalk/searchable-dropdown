@@ -21,6 +21,7 @@ Node/Express, EJS templates, and Blaze**.
 - 🎨 **Fully themeable** — restyle with `--liveselect-*` CSS custom properties or target the BEM-ish classes; ships a light and dark theme.
 - 🧩 **Custom item templates** — render each result row _and_ the `[+ Add]` row however you like with `renderOption` / `renderCreate`; return a DOM node (XSS-safe) or an HTML string. See [Custom item templates](#custom-item-templates).
 - ♿ **Accessible by default** — full ARIA combobox/listbox wiring (`aria-activedescendant`, `aria-selected`, live-region announcements) so keyboard nav is screen-reader friendly. Optional **grouped options** with `<optgroup>`-style headings.
+- 🧰 **Polish where it counts** — real `required` form validation, disabled (non-selectable) options, match highlighting, a “Showing N of M” hint, async result caching, and `open`/`close`/`search` lifecycle events.
 - 🔒 **Security-hardened server** — registry-gated collection access, field allow-listing, ReDoS-capped regex, scope filters, tenant isolation hook, prototype-pollution guards.
 - 📦 **Zero dependencies**, ~12 KB. Works as a `<script>` tag (`window.LiveSelect`), a CommonJS `require`, or an ES module `import`.
 
@@ -175,16 +176,21 @@ per-framework integration (HTML, Express, EJS, Blaze).
 | `onCreate` | `async (q, ctx) => option\|null` | — | Do anything; return an option to auto-select. |
 | `onChange` | `(value, option) => void` | — | Fires on every selection/clear. |
 | `groupBy` | `(option) => string` | — | Group results under headings. See [Grouped options](#grouped-options). |
+| `highlight` | `boolean` | `false` | Wrap the matched query substring in each result with `<mark>`. Ignored for `renderOption` rows. |
+| `cache` | `boolean` | `false` | Cache async results by query+scope+limit so repeats skip the network. Cleared by `setSource()`/`setScope()`. |
 | `classPrefix` | `string` | `'liveselect'` | CSS class prefix. |
-| `texts` | `object` | — | `{ searching, noResults, searchFailed }`. |
+| `texts` | `object` | — | `{ searching, noResults, searchFailed, required }`, plus optional `more(shown, total) => string`. |
 
-**Option shape:** `{ value, label, sublabel?, group?, raw? }`. Loose input is normalized —
-a bare string becomes `{ value, label }`; `_id`/`id` map to `value`;
-`name`/`title`/`text` map to `label`.
+**Option shape:** `{ value, label, sublabel?, group?, disabled?, raw? }`. Loose input
+is normalized — a bare string becomes `{ value, label }`; `_id`/`id` map to `value`;
+`name`/`title`/`text` map to `label`. `disabled: true` makes a row non-selectable
+(dimmed, skipped by keyboard nav).
 
 **Async source `ctx`:** `{ scope, limit, query, signal }`. `signal` is an
 `AbortSignal` that fires when a newer search supersedes the current one — pass it
-to `fetch` (the built-in `remoteSource` already does) to cancel stale requests.
+to `fetch` (the built-in `remoteSource` already does) to cancel stale requests. An
+async source may resolve to a bare array **or** `{ items, total }` — the `total`
+drives the “Showing N of M” footer when results are capped by `limit`.
 
 ## Custom item templates
 
@@ -282,6 +288,24 @@ form.addEventListener('liveselect:change', (e) => {
   console.log(e.detail); // { name, value, option }
 });
 ```
+
+It also emits bubbling lifecycle events for integration hooks:
+
+| Event | Detail | Fires when |
+|---|---|---|
+| `liveselect:open` | `{ name }` | the menu opens |
+| `liveselect:close` | `{ name }` | the menu closes |
+| `liveselect:search` | `{ name, query }` | a search runs (after debounce / `minChars`) |
+| `liveselect:change` | `{ name, value, option }` | a selection or clear happens |
+
+## Validation
+
+A `required` LiveSelect enforces selection through the **Constraint Validation
+API on its visible input** — so an empty required control blocks form submit with
+a focusable, on-screen validation bubble (override the message via
+`texts.required`). This also fixes `enhance()`: a `display:none` required
+`<select>` can’t be focused (browsers reject submit with “An invalid form control
+is not focusable”), so `enhance()` moves enforcement to the visible control.
 
 ## Theming
 

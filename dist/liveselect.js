@@ -60,8 +60,22 @@
  *   groupBy       (option) => string — group results under headings. Falls back
  *                 to each option's `group` field. Results are stably reordered so
  *                 same-group items sit together (first-seen group order kept).
+ *   highlight     boolean — wrap the matched query substring in each result's
+ *                 label/sublabel with <mark class="prefix__mark"> (default false).
+ *                 Ignored for rows produced by renderOption.
+ *   cache         boolean — cache async source results by query+scope+limit so
+ *                 repeat queries skip the network (default false). Cleared by
+ *                 setSource()/setScope().
  *   classPrefix   CSS class prefix (default 'liveselect')
- *   texts         { searching, noResults, searchFailed } message overrides
+ *   texts         { searching, noResults, searchFailed, required } overrides, plus
+ *                 optional more(shown, total) => string for the "Showing N of M" footer
+ *
+ * Per-option `disabled: true` makes a row non-selectable (skipped by keyboard nav).
+ * An async source may return `{ items, total }` (instead of a bare array) to drive
+ * the "Showing N of M" footer.
+ *
+ * Besides `liveselect:change`, the root dispatches bubbling `liveselect:open`,
+ * `liveselect:close`, and `liveselect:search` ({ query }) CustomEvents.
  *
  * The option shape the control works in:  { value, label, sublabel?, raw? }
  * Input options are normalized leniently: a bare string becomes
@@ -85,6 +99,8 @@
     searching:    'Searching…',
     noResults:    'No matches.',
     searchFailed: 'Search failed.',
+    required:     'Please select an option.',
+    // more: (shown, total) => string — overridable "Showing N of M" footer text.
   };
 
   // ---- helpers -------------------------------------------------------------
@@ -99,7 +115,7 @@
   function normalizeOption(o) {
     if (o == null) return null;
     if (typeof o === 'string' || typeof o === 'number') {
-      return { value: String(o), label: String(o), sublabel: '', group: '', raw: o };
+      return { value: String(o), label: String(o), sublabel: '', group: '', disabled: false, raw: o };
     }
     var value = o.value != null ? o.value
       : (o._id != null ? o._id : (o.id != null ? o.id : ''));
@@ -110,6 +126,7 @@
       label:    label == null || label === '' ? '(unnamed)' : String(label),
       sublabel: o.sublabel != null ? String(o.sublabel) : '',
       group:    o.group != null ? String(o.group) : '',
+      disabled: !!o.disabled,
       raw:      Object.prototype.hasOwnProperty.call(o, 'raw') ? o.raw : o,
     };
   }
@@ -156,6 +173,8 @@
     this._blurTimer  = null;
     this._reqSeq     = 0;
     this._abort      = null;   // AbortController for the in-flight async search
+    this._total      = null;   // total matches behind a capped result set (or null)
+    this._cache      = {};     // async result cache (used only when opts.cache)
 
     this._build();
     this._bind();
@@ -166,6 +185,7 @@
         ? { value: this.opts.value, label: this.opts.valueLabel, sublabel: this.opts.valueSublabel || '' }
         : undefined);
     }
+    this._syncValidity();   // required controls start invalid until a pick is made
   }
 
   LiveSelect.prototype._c = function (suffix) {
@@ -279,11 +299,13 @@
 
     if (q.length < minChars) {
       this.results = [];
+      this._total = null;
       this.activeIndex = -1;
       this._renderMenu();
       return;
     }
 
+    this._dispatch('search', { query: q });
     var src = this.opts.source;
 
     // Array source → filter locally (synchronous).
@@ -295,6 +317,7 @@
           || (o.sublabel && o.sublabel.toLowerCase().indexOf(ql) !== -1);
       });
       this.error = '';
+      this._total = filtered.length;
       this.results = this._group(filtered.slice(0, limit));
       this.activeIndex = -1;
       this._renderMenu();
@@ -303,6 +326,22 @@
 
     // Async source → call function, guard against out-of-order responses.
     if (typeof src === 'function') {
+      var key = this._cacheKey(q, limit);
+
+      // Cache hit → serve synchronously, skip the network entirely.
+      if (this.opts.cache && this._cache[key]) {
+        this._reqSeq++;                               // invalidate any in-flight
+        if (this._abort) { this._abort.abort(); this._abort = null; }
+        var c = this._cache[key];
+        this.loading = false;
+        this.error = '';
+        this._total = c.total;
+        this.results = this._group(c.items.slice(0, limit));
+        this.activeIndex = -1;
+        this._renderMenu();
+        return;
+      }
+
       var seq = ++this._reqSeq;
       // Cancel the previous in-flight request, then hand this one a fresh signal.
       if (this._abort) this._abort.abort();
@@ -318,9 +357,16 @@
       };
       Promise.resolve(src(q, ctx))
         .then(function (res) {
+          // A source may return a bare array OR { items, total }.
+          var arr = Array.isArray(res) ? res : ((res && res.items) || []);
+          var norm = normalizeList(arr);
+          var total = (res && typeof res.total === 'number') ? res.total
+            : (norm.length > limit ? norm.length : null);
+          if (self.opts.cache) self._cache[key] = { items: norm, total: total };
           if (seq !== self._reqSeq) return; // a newer search superseded this one
           self.loading = false;
-          self.results = self._group(normalizeList(res).slice(0, limit));
+          self._total = total;
+          self.results = self._group(norm.slice(0, limit));
           self.activeIndex = -1;
           self._renderMenu();
         })
@@ -329,6 +375,7 @@
           if (err && err.name === 'AbortError') return; // we cancelled it → ignore
           self.loading = false;
           self.results = [];
+          self._total = null;
           self.error = (err && (err.message || err.reason)) || self.texts.searchFailed;
           self._renderMenu();
           self._renderError();
@@ -338,7 +385,13 @@
 
     // No usable source.
     this.results = [];
+    this._total = null;
     this._renderMenu();
+  };
+
+  /** Cache key for an async query: query + scope + limit. */
+  LiveSelect.prototype._cacheKey = function (q, limit) {
+    return JSON.stringify([q, this.opts.scope || {}, limit]);
   };
 
   /** The group label for an option: opts.groupBy wins, else the option's `group`. */
@@ -404,6 +457,26 @@
 
   // -- keyboard --------------------------------------------------------------
 
+  /** Is the row at `idx` selectable? The create row (idx === results.length) is. */
+  LiveSelect.prototype._isEnabled = function (idx) {
+    if (idx < 0) return false;
+    if (idx >= this.results.length) return true;       // create row
+    return !this.results[idx].disabled;
+  };
+
+  /** Next selectable index from `from` in direction `dir`, wrapping; -1 if none. */
+  LiveSelect.prototype._step = function (from, dir, max) {
+    if (max < 0) return -1;
+    var idx = from;
+    for (var n = 0; n <= max; n++) {
+      idx += dir;
+      if (idx > max) idx = 0;
+      else if (idx < 0) idx = max;
+      if (this._isEnabled(idx)) return idx;
+    }
+    return -1;   // nothing selectable (all rows disabled)
+  };
+
   LiveSelect.prototype._handleKeydown = function (e) {
     var canCreate = this._canCreate();
     var max = this.results.length + (canCreate ? 1 : 0) - 1;
@@ -411,20 +484,18 @@
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       this._setOpen(true);
-      if (max < 0) return;
-      var d = this.activeIndex + 1; if (d > max) d = 0;
-      this.activeIndex = d; this._renderMenu();
+      var d = this._step(this.activeIndex, 1, max);
+      if (d >= 0) { this.activeIndex = d; this._renderMenu(); }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (max < 0) return;
-      var u = this.activeIndex - 1; if (u < 0) u = max;
-      this.activeIndex = u; this._renderMenu();
+      var u = this._step(this.activeIndex, -1, max);
+      if (u >= 0) { this.activeIndex = u; this._renderMenu(); }
     } else if (e.key === 'Enter') {
       if (!this.isOpen) return;
       e.preventDefault();
       var i = this.activeIndex;
       if (canCreate && i === this.results.length) this._openCreate();
-      else if (i >= 0 && this.results[i]) this._select(this.results[i]);
+      else if (i >= 0 && this.results[i] && !this.results[i].disabled) this._select(this.results[i]);
     } else if (e.key === 'Escape') {
       this._setOpen(false);
       this.activeIndex = -1;
@@ -435,6 +506,7 @@
   // -- selection / value -----------------------------------------------------
 
   LiveSelect.prototype._select = function (opt) {
+    if (opt && opt.disabled) { this.input.focus(); return; }   // non-selectable row
     this.selected = opt;
     this.query = '';
     this._setOpen(false);
@@ -456,13 +528,24 @@
     }));
   };
 
+  /** Dispatch a bubbling liveselect:<type> lifecycle event (open/close/search). */
+  LiveSelect.prototype._dispatch = function (type, detail) {
+    this.root.dispatchEvent(new CustomEvent('liveselect:' + type, {
+      bubbles: true,
+      detail: Object.assign({ name: this.opts.name || '' }, detail || {}),
+    }));
+  };
+
   // -- rendering -------------------------------------------------------------
 
   LiveSelect.prototype._setOpen = function (open) {
+    var was = this.isOpen;
     this.isOpen = open;
     this.root.classList.toggle(this.cp + '--open', open);
     this.input.setAttribute('aria-expanded', open ? 'true' : 'false');
     this.menu.hidden = !open;
+    if (open && !was) this._dispatch('open');
+    if (!open && was) this._dispatch('close');
     if (open) {
       // Show the live query (empty when freshly opened); placeholder hints the
       // current selection so the user knows what they're replacing.
@@ -482,8 +565,22 @@
   LiveSelect.prototype._syncHidden = function () {
     this.hidden.value = this.selected ? this.selected.value : '';
     this.clearEl.hidden = !(this.selected && this.opts.clearable !== false && !this.opts.disabled);
+    this._syncValidity();
     // Fire a native change so plain-form listeners / validators react.
     this.hidden.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  /**
+   * Enforce `required` on the *visible* input via the Constraint Validation API.
+   * The visible input is on-screen and focusable, so the browser can show its
+   * validation bubble and block form submit — unlike the display:none hidden
+   * <select> in enhance(), which is barred from validation. Driven by selection
+   * state, not the input's text. No-op when not required / disabled / unsupported.
+   */
+  LiveSelect.prototype._syncValidity = function () {
+    if (!this.input || typeof this.input.setCustomValidity !== 'function') return;
+    var enforce = this.opts.required && !this.opts.disabled && !this.selected;
+    this.input.setCustomValidity(enforce ? (this.texts.required || 'Please select an option.') : '');
   };
 
   LiveSelect.prototype._renderError = function () {
@@ -530,6 +627,22 @@
     return false;                                  // unknown return → default render
   };
 
+  /**
+   * Fill `el` with `text`, wrapping the first case-insensitive occurrence of `q`
+   * in <mark>. Built from text nodes + a <mark> element (no innerHTML) so it's
+   * XSS-safe regardless of the data.
+   */
+  LiveSelect.prototype._highlightInto = function (el, text, q) {
+    var i = q ? text.toLowerCase().indexOf(q.toLowerCase()) : -1;
+    if (i < 0) { el.textContent = text; return; }
+    el.appendChild(document.createTextNode(text.slice(0, i)));
+    var mark = document.createElement('mark');
+    mark.className = this.cp + '__mark';
+    mark.textContent = text.slice(i, i + q.length);
+    el.appendChild(mark);
+    el.appendChild(document.createTextNode(text.slice(i + q.length)));
+  };
+
   /** Fill a result <button> with custom (renderOption) or default content. */
   LiveSelect.prototype._fillOption = function (btn, o, index) {
     var cp = this.cp;
@@ -542,15 +655,16 @@
       };
       if (this._applyRendered(btn, this.opts.renderOption(o, ctx))) return;
     }
-    // Default: escaped two-line label / sublabel.
+    // Default: escaped two-line label / sublabel (with optional match highlight).
+    var q = this.opts.highlight ? this.query.trim() : '';
     var lab = document.createElement('span');
     lab.className = cp + '__opt-label';
-    lab.textContent = o.label;
+    this._highlightInto(lab, o.label, q);
     btn.appendChild(lab);
     if (o.sublabel) {
       var sub = document.createElement('span');
       sub.className = cp + '__opt-sub';
-      sub.textContent = o.sublabel;
+      this._highlightInto(sub, o.sublabel, q);
       btn.appendChild(sub);
     }
   };
@@ -605,9 +719,12 @@
       btn.id = optId;
       btn.setAttribute('role', 'option');
       btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      btn.className = cp + '__opt' + (isActive ? ' ' + cp + '__opt--active' : '');
+      btn.className = cp + '__opt'
+        + (isActive ? ' ' + cp + '__opt--active' : '')
+        + (o.disabled ? ' ' + cp + '__opt--disabled' : '');
       btn.setAttribute('data-liveselect-opt', '');
       btn.setAttribute('data-liveselect-index', String(i));
+      if (o.disabled) { btn.disabled = true; btn.setAttribute('aria-disabled', 'true'); }
       this._fillOption(btn, o, i);
       this.menu.appendChild(btn);
       if (isActive) activeId = optId;
@@ -630,6 +747,18 @@
       this._fillCreate(cbtn, this.query.trim());
       this.menu.appendChild(cbtn);
       if (createOn) activeId = createId;
+    }
+
+    // "Showing N of M" footer when the result set is capped.
+    var shown = this.results.length;
+    if (this._total != null && this._total > shown) {
+      var more = document.createElement('div');
+      more.className = cp + '__more';
+      more.setAttribute('role', 'presentation');
+      more.textContent = typeof this.texts.more === 'function'
+        ? this.texts.more(shown, this._total)
+        : 'Showing ' + shown + ' of ' + this._total;
+      this.menu.appendChild(more);
     }
 
     if (activeId) this.input.setAttribute('aria-activedescendant', activeId);
@@ -697,6 +826,7 @@
   /** Swap the data source (e.g. after pushing a new item to an array). */
   LiveSelect.prototype.setSource = function (source) {
     this.opts.source = source;
+    this._cache = {};   // results from the old source are no longer valid
     if (this.isOpen) this._runSearch();
   };
 
@@ -704,6 +834,7 @@
   LiveSelect.prototype.setScope = function (scope) {
     this.opts.scope = scope || {};
     this.results = [];
+    this._cache = {};   // scope is part of the cache key — drop stale entries
     if (this.isOpen) this._runSearch();
   };
 
@@ -712,6 +843,7 @@
     this.input.disabled = !!disabled;
     this.root.classList.toggle(this.cp + '--disabled', !!disabled);
     this.clearEl.hidden = !(this.selected && this.opts.clearable !== false && !disabled);
+    this._syncValidity();   // disabling clears the required constraint
   };
 
   LiveSelect.prototype.destroy = function () {
@@ -763,9 +895,10 @@
     sel.setAttribute('data-liveselect-enhanced', '');
     // A `required` control that is display:none is NOT focusable, which makes
     // browsers (e.g. Chrome) silently block form submit with "An invalid form
-    // control is not focusable." Drop required from the now-hidden select; we
-    // keep the `*` marker on the visible control and recommend validating via
-    // the liveselect:change event or on the server.
+    // control is not focusable." Drop required from the now-hidden select and let
+    // the LiveSelect enforce it on its *visible* input via the Constraint
+    // Validation API (see _syncValidity) — so submit is actually blocked, with a
+    // focusable, on-screen validation bubble, when nothing is selected.
     if (wasRequired) sel.required = false;
 
     var opts = Object.assign({

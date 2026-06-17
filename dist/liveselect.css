@@ -105,8 +105,26 @@
   flex-direction: row; align-items: center; gap: 8px;
 }
 
+/* Non-selectable option (per-option `disabled: true`). */
+.liveselect__opt--disabled {
+  opacity: 0.5; cursor: not-allowed;
+}
+.liveselect__opt--disabled:hover { background: transparent; }
+
 .liveselect__opt-label { font-weight: 600; }
 .liveselect__opt-sub   { font-size: 0.82rem; color: var(--liveselect-text-muted); }
+
+/* Matched-substring highlight (opt-in via `highlight: true`). */
+.liveselect__mark {
+  background: var(--liveselect-mark, #fde68a); color: inherit;
+  border-radius: 2px; padding: 0 1px;
+}
+
+/* "Showing N of M" footer when results are capped by `limit`. */
+.liveselect__more {
+  padding: 6px 12px; text-align: center;
+  color: var(--liveselect-text-muted); font-size: 0.8rem;
+}
 
 /* Group heading (from groupBy / option.group): non-selectable, sticky label. */
 .liveselect__group {
@@ -130,4 +148,6 @@
   --liveselect-hover:       #1f2c39;
   --liveselect-border:      #2b3947;
   --liveselect-shadow:      0 8px 28px rgba(0, 0, 0, 0.5);
+  --liveselect-mark:        #7c5b00;
 }
+.liveselect--dark .liveselect__mark { color: #ffe9a8; }
