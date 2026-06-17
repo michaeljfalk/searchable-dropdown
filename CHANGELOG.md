@@ -3,6 +3,32 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [4.0.0] - 2026-06-17
+
+Headline feature release — **multiple selection**. The major version marks the
+size of the addition; **there are no breaking changes to single-select usage**
+(everything new is gated behind `multiple: true`).
+
+### Added
+- **Multiple selection (`multiple: true`).** Selections render as removable chips:
+  - **Add** by clicking a row or typing + Enter; **remove** via a chip’s × or
+    Backspace on an empty input; re-selecting a chosen row toggles it off.
+  - The value is an **array** throughout: `getValue()` → `string[]`,
+    `getOption()` → `option[]`, `onChange(values, options)`, `setValue([...])`,
+    and `liveselect:change` detail `{ name, value: [], options: [] }`.
+  - **`maxItems`** caps selections (and suppresses the create row at the cap).
+  - **`submitFormat`** controls plain-form submission: `'repeat'` (default — one
+    hidden input per value sharing the name, like native `<select multiple>`),
+    `'bracket'` (`name[]`), or `'delimited'` (one input joined by `delimiter`).
+  - Chosen rows are marked `aria-selected` + `.liveselect__opt--chosen`; the
+    listbox is `aria-multiselectable`.
+  - **`enhance()`** auto-detects `<select multiple>`, upgrades to multi mode, and
+    keeps the original element’s selected options in sync.
+
+### Changed
+- `normalizeOption` output is unchanged; no API removed. Single-select code paths
+  are byte-for-byte compatible.
+
 ## [3.3.0] - 2026-06-17
 
 ### Added

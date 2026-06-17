@@ -382,3 +382,139 @@ test('lifecycle events: open / close / search bubble', { skip: !domAvailable }, 
   assert.equal(seen.find((s) => s[0] === 'search')[1], 'al');
   dd.destroy();
 });
+
+// ---- multiple selection (v4.0.0) ----
+
+function multi(extra) {
+  const host = mount();
+  const dd = new LiveSelect(host, Object.assign({
+    name: 'tags',
+    multiple: true,
+    source: [
+      { value: 'a', label: 'Alpha' },
+      { value: 'b', label: 'Bravo' },
+      { value: 'c', label: 'Charlie' },
+    ],
+  }, extra || {}));
+  return { host, dd };
+}
+
+test('multiple: selecting accumulates chips; getValue/onChange are arrays', { skip: !domAvailable }, () => {
+  let last = null;
+  const { host, dd } = multi({ onChange: (v, o) => { last = { v, o }; } });
+  let detail = null;
+  host.addEventListener('liveselect:change', (e) => { detail = e.detail; });
+
+  dd._select({ value: 'a', label: 'Alpha' });
+  dd._select({ value: 'c', label: 'Charlie' });
+
+  assert.deepEqual(dd.getValue(), ['a', 'c']);
+  assert.deepEqual(dd.getOption().map((o) => o.value), ['a', 'c']);
+  assert.deepEqual(last.v, ['a', 'c']);
+  assert.ok(Array.isArray(last.o) && last.o.length === 2);
+  assert.deepEqual(detail.value, ['a', 'c']);
+
+  // Two chips rendered, each with a remove button.
+  assert.equal(dd.tagsEl.querySelectorAll('.liveselect__tag').length, 2);
+  assert.equal(dd.tagsEl.querySelectorAll('[data-liveselect-remove]').length, 2);
+  dd.destroy();
+});
+
+test('multiple: re-selecting a chosen option toggles it off', { skip: !domAvailable }, () => {
+  const { dd } = multi();
+  dd._select({ value: 'a', label: 'Alpha' });
+  dd._select({ value: 'b', label: 'Bravo' });
+  dd._select({ value: 'a', label: 'Alpha' });   // toggle off
+  assert.deepEqual(dd.getValue(), ['b']);
+  dd.destroy();
+});
+
+test('multiple: chip remove and Backspace-on-empty remove values', { skip: !domAvailable }, () => {
+  const { dd } = multi();
+  dd._select({ value: 'a', label: 'Alpha' });
+  dd._select({ value: 'b', label: 'Bravo' });
+
+  dd._deselect('a');
+  assert.deepEqual(dd.getValue(), ['b']);
+
+  dd.query = '';
+  dd._handleKeydown({ key: 'Backspace', preventDefault() {} });
+  assert.deepEqual(dd.getValue(), []);
+  dd.destroy();
+});
+
+test('multiple: hidden inputs use repeated name by default', { skip: !domAvailable }, () => {
+  const { host, dd } = multi();
+  dd._select({ value: 'a', label: 'Alpha' });
+  dd._select({ value: 'b', label: 'Bravo' });
+  const inputs = host.querySelectorAll('input[type=hidden][name=tags]');
+  assert.equal(inputs.length, 2);
+  assert.deepEqual(Array.from(inputs).map((i) => i.value), ['a', 'b']);
+  dd.destroy();
+});
+
+test('multiple: submitFormat bracket and delimited', { skip: !domAvailable }, () => {
+  const b = multi({ submitFormat: 'bracket' });
+  b.dd._select({ value: 'a', label: 'Alpha' });
+  b.dd._select({ value: 'b', label: 'Bravo' });
+  assert.equal(b.host.querySelectorAll('input[name="tags[]"]').length, 2);
+  b.dd.destroy();
+
+  const d = multi({ submitFormat: 'delimited' });
+  d.dd._select({ value: 'a', label: 'Alpha' });
+  d.dd._select({ value: 'b', label: 'Bravo' });
+  const one = d.host.querySelectorAll('input[type=hidden][name=tags]');
+  assert.equal(one.length, 1);
+  assert.equal(one[0].value, 'a,b');
+  d.dd.destroy();
+});
+
+test('multiple: maxItems caps selections and suppresses create', { skip: !domAvailable }, () => {
+  const { dd } = multi({ maxItems: 2, allowCreate: true, onCreate: (q) => ({ value: q, label: q }) });
+  dd._select({ value: 'a', label: 'Alpha' });
+  dd._select({ value: 'b', label: 'Bravo' });
+  dd._select({ value: 'c', label: 'Charlie' });   // over the cap → ignored
+  assert.deepEqual(dd.getValue(), ['a', 'b']);
+  dd.query = 'New'; dd.isOpen = true; dd.results = [];
+  assert.equal(dd._canCreate(), false, 'no create row once maxItems reached');
+  dd.destroy();
+});
+
+test('multiple: required enforced until at least one selection', { skip: !domAvailable }, () => {
+  const { dd } = multi({ required: true });
+  assert.equal(dd.input.validity.valid, false);
+  dd._select({ value: 'a', label: 'Alpha' });
+  assert.equal(dd.input.validity.valid, true);
+  dd._deselect('a');
+  assert.equal(dd.input.validity.valid, false);
+  dd.destroy();
+});
+
+test('multiple: chosen rows marked aria-selected + __opt--chosen', { skip: !domAvailable }, () => {
+  const { dd } = multi();
+  dd._select({ value: 'a', label: 'Alpha' });
+  dd.isOpen = true; dd.query = ''; dd._runSearch(); dd._renderMenu();
+  const rows = dd.menu.querySelectorAll('[data-liveselect-opt]');
+  const alpha = Array.from(rows).find((r) => r.textContent.includes('Alpha'));
+  assert.equal(alpha.getAttribute('aria-selected'), 'true');
+  assert.ok(alpha.className.includes('liveselect__opt--chosen'));
+  dd.destroy();
+});
+
+test('enhance(<select multiple>) upgrades to multi and reflects back', { skip: !domAvailable }, () => {
+  const host = mount();
+  const sel = document.createElement('select');
+  sel.name = 'langs'; sel.multiple = true;
+  sel.innerHTML = '<option value="js" selected>JavaScript</option>'
+    + '<option value="py">Python</option><option value="go" selected>Go</option>';
+  host.appendChild(sel);
+
+  const dd = LiveSelect.enhance(sel);
+  assert.equal(dd.multi, true);
+  assert.deepEqual(dd.getValue().sort(), ['go', 'js']);
+
+  dd._select({ value: 'py', label: 'Python' });   // add one
+  const selected = Array.from(sel.options).filter((o) => o.selected).map((o) => o.value).sort();
+  assert.deepEqual(selected, ['go', 'js', 'py'], 'reflected into the native <select multiple>');
+  dd.destroy();
+});

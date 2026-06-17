@@ -70,6 +70,11 @@
   <div id="picker5"></div>
   <div class="out" id="out5">value: (none)</div>
 
+  <!-- ===== 6. Multiple selection ===== -->
+  <h2>6 · Multiple selection (chips · maxItems · create)</h2>
+  <div id="picker6"></div>
+  <div class="out" id="out6">value: []</div>
+
   <!-- 2. The script — exposes window.LiveSelect. -->
   <script src="../dist/liveselect.js"></script>
   <script>
@@ -138,6 +143,23 @@
     function initials(name) {
       return name.split(/\s+/).map(function (p) { return p[0]; }).slice(0, 2).join('').toUpperCase();
     }
+
+    // 6 · Multiple selection — chips, a cap, highlighting, and create.
+    var stack = ['react', 'vue', 'svelte', 'angular', 'solid', 'preact', 'lit', 'qwik'];
+    new LiveSelect('#picker6', {
+      name: 'tags',
+      label: 'Frameworks (pick up to 4)',
+      placeholder: 'Add frameworks…',
+      multiple: true,
+      maxItems: 4,
+      highlight: true,
+      source: stack,
+      allowCreate: true,
+      onCreate: function (q) { stack.push(q); return { value: q, label: q }; },
+      onChange: function (values) {
+        document.getElementById('out6').textContent = 'value: ' + JSON.stringify(values);
+      },
+    });
 
     // 5 · Grouped options — out-of-order source, stably grouped under headings.
     new LiveSelect('#picker5', {
