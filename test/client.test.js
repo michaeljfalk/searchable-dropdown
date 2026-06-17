@@ -39,7 +39,7 @@ function mount() {
 
 test('normalizeOption coerces strings and id/name shapes', { skip: !domAvailable }, () => {
   assert.deepEqual(LiveSelect.normalizeOption('apple'),
-    { value: 'apple', label: 'apple', sublabel: '', raw: 'apple' });
+    { value: 'apple', label: 'apple', sublabel: '', group: '', raw: 'apple' });
   const n = LiveSelect.normalizeOption({ _id: 'x1', name: 'Acme' });
   assert.equal(n.value, 'x1');
   assert.equal(n.label, 'Acme');
@@ -188,5 +188,83 @@ test('renderCreate: custom template for the [+ Add] row', { skip: !domAvailable 
   const createBtn = dd.menu.querySelector('[data-liveselect-create]');
   assert.ok(createBtn, 'create button keeps its data-liveselect-create hook');
   assert.equal(createBtn.querySelector('.mk').textContent, 'Create “Zeta”');
+  dd.destroy();
+});
+
+test('a11y: options get ids, aria-selected + input aria-activedescendant track the active row', { skip: !domAvailable }, () => {
+  const host = mount();
+  const dd = new LiveSelect(host, {
+    source: [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Bravo' }],
+  });
+  // input is wired to the listbox
+  assert.equal(dd.input.getAttribute('role'), 'combobox');
+  assert.equal(dd.input.getAttribute('aria-controls'), dd.menu.id);
+  assert.ok(dd.menu.id, 'menu has an id for aria-controls');
+
+  dd.query = ''; dd.isOpen = true; dd._runSearch();
+  dd.activeIndex = 1; dd._renderMenu();
+
+  const opts = dd.menu.querySelectorAll('[data-liveselect-opt]');
+  assert.equal(opts.length, 2);
+  assert.ok(opts[0].id && opts[1].id, 'each option has an id');
+  assert.equal(opts[1].getAttribute('aria-selected'), 'true');
+  assert.equal(opts[0].getAttribute('aria-selected'), 'false');
+  assert.equal(dd.input.getAttribute('aria-activedescendant'), opts[1].id);
+
+  // live region announces the result count
+  assert.match(dd.liveEl.textContent, /2 results available/);
+  dd.destroy();
+});
+
+test('AbortSignal: a superseding search aborts the previous request signal', { skip: !domAvailable }, () => {
+  if (typeof AbortController === 'undefined') return; // older runtime: feature absent by design
+  const host = mount();
+  let firstSignal = null;
+  const dd = new LiveSelect(host, {
+    debounce: 0,
+    source: (q, ctx) => {
+      if (firstSignal === null) firstSignal = ctx.signal;
+      return new Promise(() => {});   // never resolves → stays in-flight
+    },
+  });
+  dd.query = 'a';  dd._runSearch();   // first request
+  assert.ok(firstSignal, 'source received an AbortSignal in ctx');
+  assert.equal(firstSignal.aborted, false);
+
+  dd.query = 'ab'; dd._runSearch();   // supersedes → must abort the first
+  assert.equal(firstSignal.aborted, true);
+  dd.destroy();
+});
+
+test('grouped options: results are stably reordered and group headers rendered', { skip: !domAvailable }, () => {
+  const host = mount();
+  const dd = new LiveSelect(host, {
+    source: [
+      { value: '1', label: 'Apple',  group: 'Fruit' },
+      { value: '2', label: 'Carrot', group: 'Veg' },
+      { value: '3', label: 'Banana', group: 'Fruit' },
+    ],
+  });
+  dd.query = ''; dd.isOpen = true; dd._runSearch(); dd._renderMenu();
+
+  // Fruit items grouped together first (first-seen order), Veg after.
+  assert.deepEqual(dd.results.map((o) => o.value), ['1', '3', '2']);
+  const heads = Array.from(dd.menu.querySelectorAll('.liveselect__group')).map((h) => h.textContent);
+  assert.deepEqual(heads, ['Fruit', 'Veg']);
+  // Active-index navigation still maps to the (reordered) results array.
+  assert.equal(dd.menu.querySelectorAll('[data-liveselect-opt]').length, 3);
+  dd.destroy();
+});
+
+test('groupBy function takes precedence over option.group', { skip: !domAvailable }, () => {
+  const host = mount();
+  const dd = new LiveSelect(host, {
+    source: [{ value: 'a', label: 'Ann' }, { value: 'b', label: 'Bob' }, { value: 'c', label: 'Amy' }],
+    groupBy: (o) => o.label[0],   // group by first letter
+  });
+  dd.query = ''; dd.isOpen = true; dd._runSearch(); dd._renderMenu();
+  assert.deepEqual(dd.results.map((o) => o.value), ['a', 'c', 'b']); // A-group (Ann, Amy) then B (Bob)
+  const heads = Array.from(dd.menu.querySelectorAll('.liveselect__group')).map((h) => h.textContent);
+  assert.deepEqual(heads, ['A', 'B']);
   dd.destroy();
 });

@@ -24,7 +24,10 @@
  *
  * OPTIONS (all optional unless noted):
  *   source        (required) Array<option|string> OR
- *                 async (query, ctx) => Array<option>.  ctx = { scope, limit, signal }
+ *                 async (query, ctx) => Array<option>.
+ *                 ctx = { scope, limit, query, signal } — `signal` is an
+ *                 AbortSignal that fires when a newer search supersedes this one,
+ *                 so an async source can cancel its in-flight request.
  *   name          hidden-input name for plain-form usage
  *   value         initial/controlled selected value
  *   valueLabel    label for `value` (skips a resolve round-trip in edit mode)
@@ -54,6 +57,9 @@
  *                 POST to a server, push to the array); return the new option to
  *                 auto-select it, or null to cancel.
  *   onChange      (value, option) => void — called on every selection/clear
+ *   groupBy       (option) => string — group results under headings. Falls back
+ *                 to each option's `group` field. Results are stably reordered so
+ *                 same-group items sit together (first-seen group order kept).
  *   classPrefix   CSS class prefix (default 'liveselect')
  *   texts         { searching, noResults, searchFailed } message overrides
  *
@@ -70,6 +76,10 @@
   'use strict';
 
   var BLUR_CLOSE_MS = 150;
+
+  // Per-page counter → stable, unique ids for ARIA wiring (aria-activedescendant
+  // needs each option to have a DOM id the input can point at).
+  var uidSeq = 0;
 
   var DEFAULT_TEXTS = {
     searching:    'Searching…',
@@ -89,7 +99,7 @@
   function normalizeOption(o) {
     if (o == null) return null;
     if (typeof o === 'string' || typeof o === 'number') {
-      return { value: String(o), label: String(o), sublabel: '', raw: o };
+      return { value: String(o), label: String(o), sublabel: '', group: '', raw: o };
     }
     var value = o.value != null ? o.value
       : (o._id != null ? o._id : (o.id != null ? o.id : ''));
@@ -99,6 +109,7 @@
       value:    value == null ? '' : String(value),
       label:    label == null || label === '' ? '(unnamed)' : String(label),
       sublabel: o.sublabel != null ? String(o.sublabel) : '',
+      group:    o.group != null ? String(o.group) : '',
       raw:      Object.prototype.hasOwnProperty.call(o, 'raw') ? o.raw : o,
     };
   }
@@ -129,6 +140,7 @@
     this.opts = options || {};
     this.host = host;
     this.cp   = this.opts.classPrefix || 'liveselect';
+    this.uid  = this.cp + '-' + (++uidSeq);
     this.texts = Object.assign({}, DEFAULT_TEXTS, this.opts.texts || {});
 
     // state
@@ -143,6 +155,7 @@
     this._debounce   = null;
     this._blurTimer  = null;
     this._reqSeq     = 0;
+    this._abort      = null;   // AbortController for the in-flight async search
 
     this._build();
     this._bind();
@@ -182,11 +195,16 @@
         '<input type="text" class="' + cp + '__input" autocomplete="off" spellcheck="false"' +
           (o.disabled ? ' disabled' : '') +
           ' placeholder="' + escapeHtml(o.placeholder || 'Search…') + '"' +
-          ' role="combobox" aria-expanded="false" aria-autocomplete="list" data-liveselect-input>' +
+          ' role="combobox" aria-expanded="false" aria-autocomplete="list"' +
+          ' aria-haspopup="listbox" aria-controls="' + this.uid + '-menu" data-liveselect-input>' +
         '<button type="button" class="' + cp + '__clear" data-liveselect-clear aria-label="Clear selection" hidden>&times;</button>' +
-        '<div class="' + cp + '__menu" role="listbox" data-liveselect-menu hidden></div>' +
+        '<div class="' + cp + '__menu" id="' + this.uid + '-menu" role="listbox" data-liveselect-menu hidden></div>' +
       '</div>' +
       '<span class="' + cp + '__error" data-liveselect-error hidden></span>' +
+      // Visually-hidden polite live region: announces result counts / states to
+      // screen readers without a visible change.
+      '<span class="' + cp + '__sr" data-liveselect-live aria-live="polite" role="status"' +
+        ' style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0"></span>' +
       '<input type="hidden" data-liveselect-hidden' +
         (o.name ? ' name="' + escapeHtml(o.name) + '"' : '') +
         (o.required ? ' required' : '') + ' value="">';
@@ -197,6 +215,7 @@
     this.clearEl = root.querySelector('[data-liveselect-clear]');
     this.menu    = root.querySelector('[data-liveselect-menu]');
     this.errorEl = root.querySelector('[data-liveselect-error]');
+    this.liveEl  = root.querySelector('[data-liveselect-live]');
     this.hidden  = root.querySelector('[data-liveselect-hidden]');
   };
 
@@ -276,7 +295,7 @@
           || (o.sublabel && o.sublabel.toLowerCase().indexOf(ql) !== -1);
       });
       this.error = '';
-      this.results = filtered.slice(0, limit);
+      this.results = this._group(filtered.slice(0, limit));
       this.activeIndex = -1;
       this._renderMenu();
       return;
@@ -285,20 +304,29 @@
     // Async source → call function, guard against out-of-order responses.
     if (typeof src === 'function') {
       var seq = ++this._reqSeq;
+      // Cancel the previous in-flight request, then hand this one a fresh signal.
+      if (this._abort) this._abort.abort();
+      this._abort = (typeof AbortController !== 'undefined') ? new AbortController() : null;
       this.loading = true;
       this.error = '';
       this._renderMenu();
-      var ctx = { scope: this.opts.scope || {}, limit: limit, query: q };
+      var ctx = {
+        scope: this.opts.scope || {},
+        limit: limit,
+        query: q,
+        signal: this._abort ? this._abort.signal : undefined,
+      };
       Promise.resolve(src(q, ctx))
         .then(function (res) {
           if (seq !== self._reqSeq) return; // a newer search superseded this one
           self.loading = false;
-          self.results = normalizeList(res).slice(0, limit);
+          self.results = self._group(normalizeList(res).slice(0, limit));
           self.activeIndex = -1;
           self._renderMenu();
         })
         .catch(function (err) {
-          if (seq !== self._reqSeq) return;
+          if (seq !== self._reqSeq) return;            // superseded → ignore
+          if (err && err.name === 'AbortError') return; // we cancelled it → ignore
           self.loading = false;
           self.results = [];
           self.error = (err && (err.message || err.reason)) || self.texts.searchFailed;
@@ -311,6 +339,38 @@
     // No usable source.
     this.results = [];
     this._renderMenu();
+  };
+
+  /** The group label for an option: opts.groupBy wins, else the option's `group`. */
+  LiveSelect.prototype._groupOf = function (o) {
+    if (typeof this.opts.groupBy === 'function') {
+      var g = this.opts.groupBy(o);
+      return g == null ? '' : String(g);
+    }
+    return o.group || '';
+  };
+
+  /**
+   * Stably reorder a result list so same-group items sit together, preserving
+   * the order each group was first seen. No-op when nothing is grouped, so the
+   * common (ungrouped) path keeps its original order and cost.
+   */
+  LiveSelect.prototype._group = function (list) {
+    var grouped = typeof this.opts.groupBy === 'function';
+    if (!grouped) {
+      for (var i = 0; i < list.length; i++) { if (list[i].group) { grouped = true; break; } }
+    }
+    if (!grouped) return list;
+
+    var order = [], buckets = {}, self = this;
+    list.forEach(function (o) {
+      var g = self._groupOf(o);
+      if (!buckets[g]) { buckets[g] = []; order.push(g); }
+      buckets[g].push(o);
+    });
+    var out = [];
+    order.forEach(function (g) { out.push.apply(out, buckets[g]); });
+    return out;
   };
 
   // -- create row ------------------------------------------------------------
@@ -439,6 +499,23 @@
     return el;
   };
 
+  /** Push a message into the polite live region for screen readers. */
+  LiveSelect.prototype._announce = function (msg) {
+    if (this.liveEl) this.liveEl.textContent = msg || '';
+  };
+
+  /** Announce the result count (or empty/create state) after a render. */
+  LiveSelect.prototype._announceResults = function (canCreate) {
+    var n = this.results.length;
+    if (n > 0) {
+      this._announce(n + (n === 1 ? ' result available.' : ' results available.'));
+    } else if (canCreate) {
+      this._announce(this.texts.noResults + ' Press Enter to add.');
+    } else {
+      this._announce(this.texts.noResults);
+    }
+  };
+
   /**
    * Apply a renderOption/renderCreate return value to a row element.
    *   - DOM Node  → appended as-is (XSS-safe by construction)
@@ -498,24 +575,42 @@
     if (!this.isOpen) { this.menu.hidden = true; return; }
 
     this.menu.textContent = '';   // clear previous rows
+    this.input.removeAttribute('aria-activedescendant');
 
     if (this.loading) {
       this.menu.appendChild(this._msgEl(this.texts.searching));
       this.menu.hidden = false;
+      this._announce(this.texts.searching);
       this._renderError();
       return;
     }
 
+    var lastGroup = null, activeId = null;
     for (var i = 0; i < this.results.length; i++) {
       var o = this.results[i];
+      var g = this._groupOf(o);
+      if (g && g !== lastGroup) {
+        var head = document.createElement('div');
+        head.className = cp + '__group';
+        head.setAttribute('role', 'presentation');
+        head.textContent = g;          // textContent → group labels are escaped too
+        this.menu.appendChild(head);
+      }
+      lastGroup = g;
+
+      var isActive = this.activeIndex === i;
+      var optId = this.uid + '-opt-' + i;
       var btn = document.createElement('button');
       btn.type = 'button';
+      btn.id = optId;
       btn.setAttribute('role', 'option');
-      btn.className = cp + '__opt' + (this.activeIndex === i ? ' ' + cp + '__opt--active' : '');
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      btn.className = cp + '__opt' + (isActive ? ' ' + cp + '__opt--active' : '');
       btn.setAttribute('data-liveselect-opt', '');
       btn.setAttribute('data-liveselect-index', String(i));
       this._fillOption(btn, o, i);
       this.menu.appendChild(btn);
+      if (isActive) activeId = optId;
     }
 
     var canCreate = this._canCreate();
@@ -523,16 +618,23 @@
       this.menu.appendChild(this._msgEl(this.texts.noResults));
     }
     if (canCreate) {
-      var createActive = this.activeIndex === this.results.length ? (' ' + cp + '__opt--active') : '';
+      var createOn = this.activeIndex === this.results.length;
+      var createId = this.uid + '-create';
       var cbtn = document.createElement('button');
       cbtn.type = 'button';
-      cbtn.className = cp + '__opt ' + cp + '__opt--create' + createActive;
+      cbtn.id = createId;
+      cbtn.setAttribute('role', 'option');
+      cbtn.setAttribute('aria-selected', createOn ? 'true' : 'false');
+      cbtn.className = cp + '__opt ' + cp + '__opt--create' + (createOn ? ' ' + cp + '__opt--active' : '');
       cbtn.setAttribute('data-liveselect-create', '');
       this._fillCreate(cbtn, this.query.trim());
       this.menu.appendChild(cbtn);
+      if (createOn) activeId = createId;
     }
 
+    if (activeId) this.input.setAttribute('aria-activedescendant', activeId);
     this.menu.hidden = false;
+    this._announceResults(canCreate);
     this._renderError();
   };
 
@@ -615,6 +717,7 @@
   LiveSelect.prototype.destroy = function () {
     clearTimeout(this._debounce);
     clearTimeout(this._blurTimer);
+    if (this._abort) { this._abort.abort(); this._abort = null; }
     this.input.removeEventListener('input', this._onInput);
     this.input.removeEventListener('focus', this._onFocus);
     this.input.removeEventListener('blur', this._onBlur);
@@ -728,8 +831,11 @@
 
     var api = {
       source: function (query, ctx) {
-        return f(base + '/search?' + qs(query, ctx), { headers: headers, credentials: 'same-origin' })
-          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+        return f(base + '/search?' + qs(query, ctx), {
+          headers: headers,
+          credentials: 'same-origin',
+          signal: ctx && ctx.signal,   // cancels when a newer search supersedes this one
+        }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
       },
       resolve: function (value) {
         return f(base + '/option/' + encodeURIComponent(value), { headers: headers, credentials: 'same-origin' })

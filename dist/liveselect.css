@@ -108,6 +108,15 @@
 .liveselect__opt-label { font-weight: 600; }
 .liveselect__opt-sub   { font-size: 0.82rem; color: var(--liveselect-text-muted); }
 
+/* Group heading (from groupBy / option.group): non-selectable, sticky label. */
+.liveselect__group {
+  position: sticky; top: -6px;
+  padding: 8px 12px 4px;
+  background: var(--liveselect-surface);
+  color: var(--liveselect-text-muted);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+}
+
 .liveselect__msg   { padding: 10px 12px; color: var(--liveselect-text-muted); font-size: 0.92rem; }
 .liveselect__error { color: var(--liveselect-danger); font-size: 0.82rem; }
 .liveselect__error[hidden] { display: none; }
