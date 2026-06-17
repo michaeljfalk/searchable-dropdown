@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [4.0.1] - 2026-06-17
+
+### Docs
+- End-to-end consistency pass for the v4 API. No code changes.
+- IMPLEMENTATION.md: added a "Multiple selection" section (chips, array value,
+  `submitFormat` table); noted `enhance()`'s `<select multiple>` auto-upgrade;
+  corrected the search-route response shape to `{ value, label, sublabel }`
+  (raw is opt-in via `exposeRaw`); documented automatic `AbortSignal`
+  cancellation and `cache: true`; and rewrote the "required" note — required now
+  blocks submit via the Constraint Validation API (since 3.3.0), not cosmetic.
+- README.md: corrected the bundle-size figure (~14 KB gzipped JS + ~2 KB CSS)
+  and the CI Node matrix (18/20/22/24).
+
 ## [4.0.0] - 2026-06-17
 
 Headline feature release — **multiple selection**. The major version marks the
