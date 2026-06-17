@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [4.0.2] - 2026-06-17
+
+### Docs
+- SECURITY.md: updated the supported-versions table to 4.x and fixed the
+  cross-reference to the security model (now `IMPLEMENTATION.md §9`). No code changes.
+
 ## [4.0.1] - 2026-06-17
 
 ### Docs
