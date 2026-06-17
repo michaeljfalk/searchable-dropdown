@@ -19,6 +19,7 @@ Node/Express, EJS templates, and Blaze**.
 - ➕ **`[+ Add new]` row** — appears when the typed text has no match; your `onCreate` can do _anything_ (open a modal, POST to a server, push to an array) and return the new option to auto-select it.
 - 🔁 **Drop-in `<select>` replacement** — `LiveSelect.enhance(selectEl)` upgrades an existing `<select>` in place; a hidden `<input name>` means it submits inside a plain `<form>` like a native control.
 - 🎨 **Fully themeable** — restyle with `--liveselect-*` CSS custom properties or target the BEM-ish classes; ships a light and dark theme.
+- 🧩 **Custom item templates** — render each result row _and_ the `[+ Add]` row however you like with `renderOption` / `renderCreate`; return a DOM node (XSS-safe) or an HTML string. See [Custom item templates](#custom-item-templates).
 - 🔒 **Security-hardened server** — registry-gated collection access, field allow-listing, ReDoS-capped regex, scope filters, tenant isolation hook, prototype-pollution guards.
 - 📦 **Zero dependencies**, ~12 KB. Works as a `<script>` tag (`window.LiveSelect`), a CommonJS `require`, or an ES module `import`.
 
@@ -262,6 +263,36 @@ router against an in-memory MongoDB — including the security regressions from 
 audit (no document disclosure, generic errors, NoSQL operator-injection,
 allow-listing, dedup). CI runs them on Node 18/20/22 (`.github/workflows/ci.yml`).
 The library itself ships with **zero runtime dependencies**.
+
+## Releasing
+
+Releases are **tag-driven** — pushing a `vX.Y.Z` git tag is the single action that
+publishes to npm and keeps GitHub and the registry in sync. The
+[`publish.yml`](./.github/workflows/publish.yml) workflow runs the tests,
+verifies the tag matches `package.json`, and runs `npm publish --provenance`
+using the `NPM_TOKEN` repository secret (an npm **automation** token, which
+bypasses 2FA so CI can publish non-interactively).
+
+To cut a release:
+
+```bash
+# 1. Bump the version + add a CHANGELOG entry, land it on main (PR or direct).
+npm version 3.2.0 --no-git-tag-version   # or edit package.json by hand
+# 2. Commit, push to main, then tag and push the tag:
+git tag -a v3.2.0 -m "v3.2.0: <summary>"
+git push origin main
+git push origin v3.2.0                    # ← this triggers the publish workflow
+```
+
+The tag must point at a commit on `main` (clean provenance), and its version
+must equal `package.json`'s — CI fails the release if they differ. A plain
+`git push` of code (no tag) never publishes; only `v*` tags and the manual
+**workflow_dispatch** trigger do.
+
+> **Local publish** is supported too but not the normal path. It needs the
+> automation token in `~/.npmrc` (e.g. `//registry.npmjs.org/:_authToken=${NPM_TOKEN}`
+> with `NPM_TOKEN` exported). Avoid `npm login` — it overwrites the token with a
+> web session that re-introduces the interactive 2FA prompt.
 
 ## Repository layout
 
