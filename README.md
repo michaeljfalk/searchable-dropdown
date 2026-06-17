@@ -17,7 +17,8 @@ Node/Express, EJS templates, and Blaze**.
 - 🔎 **Live search** — debounced, keyboard-navigable (↑/↓/Enter/Esc), touch-friendly two-line options.
 - 🗂 **Any data source** — a plain **array** _or_ an **async function** (wire it to **MongoDB** via the included Express backend, or anything else).
 - ➕ **`[+ Add new]` row** — appears when the typed text has no match; your `onCreate` can do _anything_ (open a modal, POST to a server, push to an array) and return the new option to auto-select it.
-- 🔁 **Drop-in `<select>` replacement** — `LiveSelect.enhance(selectEl)` upgrades an existing `<select>` in place; a hidden `<input name>` means it submits inside a plain `<form>` like a native control.
+- 🔁 **Drop-in `<select>` replacement** — `LiveSelect.enhance(selectEl)` upgrades an existing `<select>` in place; a hidden `<input name>` means it submits inside a plain `<form>` like a native control. Also upgrades `<select multiple>`.
+- 🏷 **Multiple selection** — `multiple: true` for removable chips, array values, `maxItems`, and configurable form submission (`repeat`/`bracket`/`delimited`). See [Multiple selection](#multiple-selection).
 - 🎨 **Fully themeable** — restyle with `--liveselect-*` CSS custom properties or target the BEM-ish classes; ships a light and dark theme.
 - 🧩 **Custom item templates** — render each result row _and_ the `[+ Add]` row however you like with `renderOption` / `renderCreate`; return a DOM node (XSS-safe) or an HTML string. See [Custom item templates](#custom-item-templates).
 - ♿ **Accessible by default** — full ARIA combobox/listbox wiring (`aria-activedescendant`, `aria-selected`, live-region announcements) so keyboard nav is screen-reader friendly. Optional **grouped options** with `<optgroup>`-style headings.
@@ -178,6 +179,10 @@ per-framework integration (HTML, Express, EJS, Blaze).
 | `groupBy` | `(option) => string` | — | Group results under headings. See [Grouped options](#grouped-options). |
 | `highlight` | `boolean` | `false` | Wrap the matched query substring in each result with `<mark>`. Ignored for `renderOption` rows. |
 | `cache` | `boolean` | `false` | Cache async results by query+scope+limit so repeats skip the network. Cleared by `setSource()`/`setScope()`. |
+| `multiple` | `boolean` | `false` | Multi-select mode — chips, array value. See [Multiple selection](#multiple-selection). |
+| `maxItems` | `number` | — | Cap the number of selections (multiple mode). |
+| `submitFormat` | `'repeat'`\|`'bracket'`\|`'delimited'` | `'repeat'` | How multiple values submit in a plain form. |
+| `delimiter` | `string` | `','` | Joiner for `submitFormat: 'delimited'`. |
 | `classPrefix` | `string` | `'liveselect'` | CSS class prefix. |
 | `texts` | `object` | — | `{ searching, noResults, searchFailed, required }`, plus optional `more(shown, total) => string`. |
 
@@ -232,6 +237,33 @@ The normalized option passed in is `{ value, label, sublabel, raw }`, where
 label/sublabel. The `createLabel` option still works for a plain-text add row;
 `renderCreate` supersedes it when both are set.
 
+## Multiple selection
+
+Set `multiple: true` for a tags/chips multi-select. Selections render as removable
+chips; the value becomes an **array** throughout the API.
+
+```js
+const ms = new LiveSelect('#tags', {
+  name: 'tags',
+  multiple: true,
+  source: ['react', 'vue', 'svelte', 'angular', 'solid'],
+  maxItems: 3,                 // optional cap
+  onChange: (values, options) => console.log(values), // ['react','vue']
+});
+ms.getValue();   // → ['react', 'vue']   (an array in multiple mode)
+ms.setValue(['react', 'svelte']);        // value is an array too
+```
+
+- **Add**: click a row, or type + Enter. **Remove**: click a chip’s ×, or press
+  Backspace on an empty input. Re-selecting a chosen row toggles it off.
+- **Form submission** (`submitFormat`): `'repeat'` (default) emits one hidden
+  input per value sharing `name` — exactly like a native `<select multiple>`, so
+  Express/most frameworks parse `req.body.tags` as an array. `'bracket'` uses
+  `name="tags[]"` (PHP/Rails); `'delimited'` joins into one input via `delimiter`.
+- **`enhance()`** auto-upgrades a `<select multiple>` to this mode and keeps the
+  original element’s selected options in sync.
+- The `liveselect:change` detail carries `{ name, value: string[], options: [] }`.
+
 ## Grouped options
 
 Render results under headings (like `<optgroup>`) by giving options a `group`
@@ -278,6 +310,9 @@ focus() · open() · close() · setSource(src) · setScope(obj)
 setDisabled(bool) · destroy()
 ```
 
+In **multiple** mode, `getValue()` returns an array of values, `getOption()` an
+array of options, and `setValue()` accepts an array.
+
 ## Events
 
 Besides the `onChange` callback, the control dispatches a **bubbling**
@@ -296,7 +331,7 @@ It also emits bubbling lifecycle events for integration hooks:
 | `liveselect:open` | `{ name }` | the menu opens |
 | `liveselect:close` | `{ name }` | the menu closes |
 | `liveselect:search` | `{ name, query }` | a search runs (after debounce / `minChars`) |
-| `liveselect:change` | `{ name, value, option }` | a selection or clear happens |
+| `liveselect:change` | `{ name, value, option }` | a selection or clear happens (in multiple mode: `{ name, value: [], options: [] }`) |
 
 ## Validation
 

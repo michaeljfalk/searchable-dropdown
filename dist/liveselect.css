@@ -75,6 +75,47 @@
 .liveselect__clear:hover { background: var(--liveselect-hover); color: var(--liveselect-text); }
 .liveselect__clear[hidden] { display: none; }
 
+/* ---- Multiple selection (chips) ---- */
+.liveselect__tags { display: contents; }
+.liveselect__tags[hidden] { display: none; }
+
+.liveselect--multi .liveselect__control {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 6px 38px 6px 8px;
+  background: var(--liveselect-bg);
+  border: 1px solid var(--liveselect-border);
+  border-radius: var(--liveselect-radius);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.liveselect--multi .liveselect__control:focus-within {
+  border-color: var(--liveselect-border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--liveselect-border-focus) 22%, transparent);
+}
+/* The input becomes a borderless, auto-growing field sitting after the chips. */
+.liveselect--multi .liveselect__input {
+  flex: 1 1 80px; width: auto; min-width: 80px;
+  padding: 4px 2px; border: 0; background: transparent; box-shadow: none;
+}
+.liveselect--multi .liveselect__input:focus { border: 0; box-shadow: none; }
+
+.liveselect__tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 4px 2px 9px;
+  background: var(--liveselect-hover);
+  border: 1px solid var(--liveselect-border);
+  border-radius: 999px;
+  font-size: 0.86rem; line-height: 1.4; max-width: 100%;
+}
+.liveselect__tag-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liveselect__tag-remove {
+  flex: 0 0 auto; width: 18px; height: 18px;
+  border: 0; border-radius: 50%; background: transparent;
+  color: var(--liveselect-text-muted); cursor: pointer;
+  font-size: 1.05rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.liveselect__tag-remove:hover { background: var(--liveselect-border); color: var(--liveselect-text); }
+
 /* Dropdown menu. */
 .liveselect__menu {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0;
@@ -110,6 +151,14 @@
   opacity: 0.5; cursor: not-allowed;
 }
 .liveselect__opt--disabled:hover { background: transparent; }
+
+/* Chosen row in multiple mode: tinted, with a trailing checkmark. */
+.liveselect__opt--chosen { color: var(--liveselect-accent); }
+.liveselect__opt--chosen::after {
+  content: "✓"; position: absolute; right: 12px;
+  font-weight: 700; color: var(--liveselect-accent);
+}
+.liveselect--multi .liveselect__opt { position: relative; padding-right: 30px; }
 
 .liveselect__opt-label { font-weight: 600; }
 .liveselect__opt-sub   { font-size: 0.82rem; color: var(--liveselect-text-muted); }

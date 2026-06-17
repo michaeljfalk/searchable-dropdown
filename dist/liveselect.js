@@ -66,6 +66,15 @@
  *   cache         boolean — cache async source results by query+scope+limit so
  *                 repeat queries skip the network (default false). Cleared by
  *                 setSource()/setScope().
+ *   multiple      boolean — multi-select mode (default false). Selections render
+ *                 as removable chips; getValue() returns an array; onChange gets
+ *                 (values[], options[]); `value` accepts an array.
+ *   maxItems      number — cap the number of selections in multiple mode.
+ *   submitFormat  'repeat' | 'bracket' | 'delimited' — how multiple values submit
+ *                 in a plain form (default 'repeat' = one input per value sharing
+ *                 the name, like native <select multiple>). 'bracket' uses name[];
+ *                 'delimited' joins into one input via `delimiter` (default ',').
+ *   delimiter     string joiner for submitFormat:'delimited' (default ',').
  *   classPrefix   CSS class prefix (default 'liveselect')
  *   texts         { searching, noResults, searchFailed, required } overrides, plus
  *                 optional more(shown, total) => string for the "Showing N of M" footer
@@ -159,15 +168,17 @@
     this.cp   = this.opts.classPrefix || 'liveselect';
     this.uid  = this.cp + '-' + (++uidSeq);
     this.texts = Object.assign({}, DEFAULT_TEXTS, this.opts.texts || {});
+    this.multi = !!this.opts.multiple;
 
     // state
-    this.query       = '';
-    this.results     = [];
-    this.isOpen      = false;
-    this.loading     = false;
-    this.error       = '';
-    this.activeIndex = -1;
-    this.selected    = null;
+    this.query        = '';
+    this.results      = [];
+    this.isOpen       = false;
+    this.loading      = false;
+    this.error        = '';
+    this.activeIndex  = -1;
+    this.selected     = null;   // single mode: the chosen option (or null)
+    this.selectedList = [];     // multiple mode: array of chosen options
     this._appliedValue = undefined;
     this._debounce   = null;
     this._blurTimer  = null;
@@ -181,9 +192,13 @@
 
     // Initial / controlled value
     if ('value' in this.opts) {
-      this.setValue(this.opts.value, this.opts.valueLabel != null
-        ? { value: this.opts.value, label: this.opts.valueLabel, sublabel: this.opts.valueSublabel || '' }
-        : undefined);
+      if (this.multi) {
+        this.setValue(this.opts.value, this.opts.valueLabel);
+      } else {
+        this.setValue(this.opts.value, this.opts.valueLabel != null
+          ? { value: this.opts.value, label: this.opts.valueLabel, sublabel: this.opts.valueSublabel || '' }
+          : undefined);
+      }
     }
     this._syncValidity();   // required controls start invalid until a pick is made
   }
@@ -202,6 +217,7 @@
     root.className = cp;
     root.setAttribute('data-liveselect', '');
     if (o.disabled) root.classList.add(cp + '--disabled');
+    if (this.multi) root.classList.add(cp + '--multi');
 
     var labelHtml = '';
     if (o.label) {
@@ -212,31 +228,39 @@
     root.innerHTML =
       labelHtml +
       '<div class="' + cp + '__control">' +
+        // Multi-select chips render here, before the input.
+        '<span class="' + cp + '__tags" data-liveselect-tags' + (this.multi ? '' : ' hidden') + '></span>' +
         '<input type="text" class="' + cp + '__input" autocomplete="off" spellcheck="false"' +
           (o.disabled ? ' disabled' : '') +
           ' placeholder="' + escapeHtml(o.placeholder || 'Search…') + '"' +
           ' role="combobox" aria-expanded="false" aria-autocomplete="list"' +
           ' aria-haspopup="listbox" aria-controls="' + this.uid + '-menu" data-liveselect-input>' +
         '<button type="button" class="' + cp + '__clear" data-liveselect-clear aria-label="Clear selection" hidden>&times;</button>' +
-        '<div class="' + cp + '__menu" id="' + this.uid + '-menu" role="listbox" data-liveselect-menu hidden></div>' +
+        '<div class="' + cp + '__menu" id="' + this.uid + '-menu" role="listbox"' +
+          (this.multi ? ' aria-multiselectable="true"' : '') + ' data-liveselect-menu hidden></div>' +
       '</div>' +
       '<span class="' + cp + '__error" data-liveselect-error hidden></span>' +
       // Visually-hidden polite live region: announces result counts / states to
       // screen readers without a visible change.
       '<span class="' + cp + '__sr" data-liveselect-live aria-live="polite" role="status"' +
         ' style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0"></span>' +
+      // Single-select submits via this one hidden input; multi-select generates
+      // its own inputs into the wrap below (and leaves this one nameless/empty).
       '<input type="hidden" data-liveselect-hidden' +
-        (o.name ? ' name="' + escapeHtml(o.name) + '"' : '') +
-        (o.required ? ' required' : '') + ' value="">';
+        (o.name && !this.multi ? ' name="' + escapeHtml(o.name) + '"' : '') +
+        (o.required && !this.multi ? ' required' : '') + ' value="">' +
+      '<span data-liveselect-hidden-list></span>';
 
     this.host.appendChild(root);
-    this.root    = root;
-    this.input   = root.querySelector('[data-liveselect-input]');
-    this.clearEl = root.querySelector('[data-liveselect-clear]');
-    this.menu    = root.querySelector('[data-liveselect-menu]');
-    this.errorEl = root.querySelector('[data-liveselect-error]');
-    this.liveEl  = root.querySelector('[data-liveselect-live]');
-    this.hidden  = root.querySelector('[data-liveselect-hidden]');
+    this.root      = root;
+    this.input     = root.querySelector('[data-liveselect-input]');
+    this.clearEl   = root.querySelector('[data-liveselect-clear]');
+    this.menu      = root.querySelector('[data-liveselect-menu]');
+    this.errorEl   = root.querySelector('[data-liveselect-error]');
+    this.liveEl    = root.querySelector('[data-liveselect-live]');
+    this.hidden    = root.querySelector('[data-liveselect-hidden]');
+    this.tagsEl    = root.querySelector('[data-liveselect-tags]');
+    this.hiddenList = root.querySelector('[data-liveselect-hidden-list]');
   };
 
   // -- event binding ---------------------------------------------------------
@@ -275,12 +299,21 @@
     };
     this._onClearDown = function (e) { e.preventDefault(); self.clear(); };
 
+    // Chip remove buttons (multi mode). mousedown so it beats the input blur.
+    this._onTagsDown = function (e) {
+      var rm = e.target.closest('[data-liveselect-remove]');
+      if (!rm) return;
+      e.preventDefault();
+      self._deselect(rm.getAttribute('data-liveselect-remove'));
+    };
+
     this.input.addEventListener('input', this._onInput);
     this.input.addEventListener('focus', this._onFocus);
     this.input.addEventListener('blur', this._onBlur);
     this.input.addEventListener('keydown', this._onKeydown);
     this.menu.addEventListener('mousedown', this._onMenuDown);
     this.clearEl.addEventListener('mousedown', this._onClearDown);
+    this.tagsEl.addEventListener('mousedown', this._onTagsDown);
   };
 
   // -- searching -------------------------------------------------------------
@@ -430,13 +463,20 @@
 
   LiveSelect.prototype._canCreate = function () {
     if (!this.opts.allowCreate || typeof this.opts.onCreate !== 'function') return false;
+    if (this.multi && this.opts.maxItems != null && this.selectedList.length >= this.opts.maxItems) return false;
     var q = this.query.trim();
     if (!q) return false;
     var ql = q.toLowerCase();
     var exact = this.results.some(function (o) {
       return o.label.trim().toLowerCase() === ql || (o.sublabel || '').trim().toLowerCase() === ql;
     });
-    return !exact;
+    if (exact) return false;
+    // In multi mode a chip already matching the text also counts as "exists".
+    if (this.multi) {
+      var chosen = this.selectedList.some(function (o) { return o.label.trim().toLowerCase() === ql; });
+      if (chosen) return false;
+    }
+    return true;
   };
 
   LiveSelect.prototype._openCreate = function () {
@@ -478,6 +518,13 @@
   };
 
   LiveSelect.prototype._handleKeydown = function (e) {
+    // Multi mode: Backspace on an empty query removes the last chip.
+    if (this.multi && e.key === 'Backspace' && this.query === '' && this.selectedList.length) {
+      e.preventDefault();
+      this._deselect(this.selectedList[this.selectedList.length - 1].value);
+      return;
+    }
+
     var canCreate = this._canCreate();
     var max = this.results.length + (canCreate ? 1 : 0) - 1;
 
@@ -507,6 +554,7 @@
 
   LiveSelect.prototype._select = function (opt) {
     if (opt && opt.disabled) { this.input.focus(); return; }   // non-selectable row
+    if (this.multi) return this._toggle(opt);
     this.selected = opt;
     this.query = '';
     this._setOpen(false);
@@ -517,7 +565,97 @@
     this._emit(opt);
   };
 
+  // ---- multiple-selection helpers ----
+
+  LiveSelect.prototype._indexOfValue = function (value) {
+    var v = String(value);
+    for (var i = 0; i < this.selectedList.length; i++) {
+      if (this.selectedList[i].value === v) return i;
+    }
+    return -1;
+  };
+
+  LiveSelect.prototype._isChosen = function (value) { return this._indexOfValue(value) >= 0; };
+
+  /** Add or toggle-off an option in multiple mode (respecting maxItems). */
+  LiveSelect.prototype._toggle = function (opt) {
+    if (!opt) return;
+    var i = this._indexOfValue(opt.value);
+    if (i >= 0) {
+      this.selectedList.splice(i, 1);          // clicking a chosen row removes it
+    } else {
+      var max = this.opts.maxItems;
+      if (max != null && this.selectedList.length >= max) {
+        this._announce('Maximum of ' + max + ' reached.');
+        this.input.focus();
+        return;
+      }
+      this.selectedList.push(opt);
+    }
+    this._afterMultiChange(true);
+  };
+
+  /** Remove a value in multiple mode (chip × or Backspace). */
+  LiveSelect.prototype._deselect = function (value) {
+    var i = this._indexOfValue(value);
+    if (i < 0) return;
+    this.selectedList.splice(i, 1);
+    this._afterMultiChange(this.isOpen);
+  };
+
+  /** Shared post-change sync for multiple mode. */
+  LiveSelect.prototype._afterMultiChange = function (keepOpen) {
+    clearTimeout(this._blurTimer);   // picking from the menu blurred the input; stay open
+    this.query = '';
+    this.activeIndex = -1;
+    this._renderTags();
+    this._syncInput();
+    this._syncHidden();
+    this._emit();
+    this.input.focus();
+    if (keepOpen) { this._setOpen(true); this._runSearch(); }
+    else this._renderMenu();
+  };
+
+  /** Render the selected-value chips (multiple mode). */
+  LiveSelect.prototype._renderTags = function () {
+    if (!this.multi) return;
+    var cp = this.cp, self = this;
+    this.tagsEl.textContent = '';
+    this.selectedList.forEach(function (o) {
+      var chip = document.createElement('span');
+      chip.className = cp + '__tag';
+      var lab = document.createElement('span');
+      lab.className = cp + '__tag-label';
+      lab.textContent = o.label;             // textContent → labels stay escaped
+      chip.appendChild(lab);
+      if (!self.opts.disabled) {
+        var rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = cp + '__tag-remove';
+        rm.setAttribute('data-liveselect-remove', o.value);
+        rm.setAttribute('aria-label', 'Remove ' + o.label);
+        rm.innerHTML = '&times;';
+        chip.appendChild(rm);
+      }
+      self.tagsEl.appendChild(chip);
+    });
+    this.tagsEl.hidden = this.selectedList.length === 0;
+  };
+
   LiveSelect.prototype._emit = function (opt) {
+    if (this.multi) {
+      var values  = this.selectedList.map(function (o) { return o.value; });
+      var options = this.selectedList.slice();
+      if (typeof this.opts.onChange === 'function') {
+        try { this.opts.onChange(values, options); } catch (e) { /* swallow */ }
+      }
+      this.root.dispatchEvent(new CustomEvent('liveselect:change', {
+        bubbles: true,
+        detail: { name: this.opts.name || '', value: values, options: options, option: null },
+      }));
+      return;
+    }
     var value = opt ? opt.value : '';
     if (typeof this.opts.onChange === 'function') {
       try { this.opts.onChange(value, opt || null); } catch (e) { /* swallow */ }
@@ -557,17 +695,54 @@
 
   LiveSelect.prototype._syncInput = function () {
     if (this.isOpen) { this.input.value = this.query; return; }
+    if (this.multi) {
+      this.input.value = '';                 // chips carry the selection, not the input
+      this.input.placeholder = this.opts.placeholder || 'Search…';
+      this.clearEl.hidden = !(this.selectedList.length && this.opts.clearable !== false && !this.opts.disabled);
+      return;
+    }
     this.input.value = this.selected ? this.selected.label : '';
     this.input.placeholder = this.opts.placeholder || 'Search…';
     this.clearEl.hidden = !(this.selected && this.opts.clearable !== false && !this.opts.disabled);
   };
 
   LiveSelect.prototype._syncHidden = function () {
-    this.hidden.value = this.selected ? this.selected.value : '';
-    this.clearEl.hidden = !(this.selected && this.opts.clearable !== false && !this.opts.disabled);
+    if (this.multi) {
+      this._syncHiddenMulti();
+      this.clearEl.hidden = !(this.selectedList.length && this.opts.clearable !== false && !this.opts.disabled);
+    } else {
+      this.hidden.value = this.selected ? this.selected.value : '';
+      this.clearEl.hidden = !(this.selected && this.opts.clearable !== false && !this.opts.disabled);
+    }
     this._syncValidity();
     // Fire a native change so plain-form listeners / validators react.
     this.hidden.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  /** Regenerate the hidden inputs for multiple mode per `submitFormat`. */
+  LiveSelect.prototype._syncHiddenMulti = function () {
+    this.hiddenList.textContent = '';
+    var name = this.opts.name;
+    if (!name) return;                       // no name → nothing submits
+    var values = this.selectedList.map(function (o) { return o.value; });
+    var fmt = this.opts.submitFormat || 'repeat';
+
+    if (fmt === 'delimited') {
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = values.join(this.opts.delimiter != null ? this.opts.delimiter : ',');
+      this.hiddenList.appendChild(input);
+      return;
+    }
+    var fieldName = fmt === 'bracket' ? name + '[]' : name;
+    for (var i = 0; i < values.length; i++) {
+      var inp = document.createElement('input');
+      inp.type = 'hidden';
+      inp.name = fieldName;
+      inp.value = values[i];
+      this.hiddenList.appendChild(inp);
+    }
   };
 
   /**
@@ -579,7 +754,8 @@
    */
   LiveSelect.prototype._syncValidity = function () {
     if (!this.input || typeof this.input.setCustomValidity !== 'function') return;
-    var enforce = this.opts.required && !this.opts.disabled && !this.selected;
+    var empty = this.multi ? this.selectedList.length === 0 : !this.selected;
+    var enforce = this.opts.required && !this.opts.disabled && empty;
     this.input.setCustomValidity(enforce ? (this.texts.required || 'Please select an option.') : '');
   };
 
@@ -713,14 +889,18 @@
       lastGroup = g;
 
       var isActive = this.activeIndex === i;
+      var isChosen = this.multi && this._isChosen(o.value);
       var optId = this.uid + '-opt-' + i;
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.id = optId;
       btn.setAttribute('role', 'option');
-      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      // Multi: aria-selected reflects chosen state (active is shown by
+      // aria-activedescendant). Single: aria-selected tracks the active row.
+      btn.setAttribute('aria-selected', (this.multi ? isChosen : isActive) ? 'true' : 'false');
       btn.className = cp + '__opt'
         + (isActive ? ' ' + cp + '__opt--active' : '')
+        + (isChosen ? ' ' + cp + '__opt--chosen' : '')
         + (o.disabled ? ' ' + cp + '__opt--disabled' : '');
       btn.setAttribute('data-liveselect-opt', '');
       btn.setAttribute('data-liveselect-index', String(i));
@@ -769,11 +949,16 @@
 
   // -- public API ------------------------------------------------------------
 
-  /** Current selected value (the string that submits in a form). */
-  LiveSelect.prototype.getValue = function () { return this.selected ? this.selected.value : ''; };
+  /** Current value: a string (single) or an array of value strings (multiple). */
+  LiveSelect.prototype.getValue = function () {
+    if (this.multi) return this.selectedList.map(function (o) { return o.value; });
+    return this.selected ? this.selected.value : '';
+  };
 
-  /** Current selected option object, or null. */
-  LiveSelect.prototype.getOption = function () { return this.selected; };
+  /** Current option(s): an option/null (single) or an array of options (multiple). */
+  LiveSelect.prototype.getOption = function () {
+    return this.multi ? this.selectedList.slice() : this.selected;
+  };
 
   /**
    * setValue — select by value. Pass `option` to set the label without a lookup;
@@ -781,6 +966,36 @@
    */
   LiveSelect.prototype.setValue = function (value, option) {
     var self = this;
+
+    // Multiple mode: value is an array of values; option (optional) is a parallel
+    // array of labels or option objects.
+    if (this.multi) {
+      var values = Array.isArray(value) ? value : (value == null || value === '' ? [] : [value]);
+      var labels = Array.isArray(option) ? option : null;
+      this.selectedList = [];
+      values.forEach(function (raw, idx) {
+        var vv = String(raw);
+        var lbl = labels && labels[idx];
+        if (lbl != null && typeof lbl === 'object') { self.selectedList.push(normalizeOption(lbl)); return; }
+        if (lbl != null) { self.selectedList.push(normalizeOption({ value: vv, label: lbl })); return; }
+        if (Array.isArray(self.opts.source)) {
+          var hit = normalizeList(self.opts.source).find(function (o) { return o.value === vv; });
+          if (hit) { self.selectedList.push(hit); return; }
+        }
+        if (typeof self.opts.resolve === 'function') {
+          Promise.resolve(self.opts.resolve(vv, { scope: self.opts.scope || {} }))
+            .then(function (opt) { if (opt) { self.selectedList.push(normalizeOption(opt)); self._renderTags(); self._syncHidden(); } })
+            .catch(function () { /* leave unresolved */ });
+          return;
+        }
+        self.selectedList.push(normalizeOption({ value: vv, label: vv }));
+      });
+      this._renderTags();
+      this._syncInput();
+      this._syncHidden();
+      return;
+    }
+
     var v = value == null ? '' : String(value);
     this._appliedValue = v;
 
@@ -809,10 +1024,12 @@
 
   LiveSelect.prototype.clear = function () {
     this.selected = null;
+    this.selectedList = [];
     this.query = '';
     this.results = [];
     this.activeIndex = -1;
     this._appliedValue = '';
+    if (this.multi) this._renderTags();
     this._syncInput();
     this._syncHidden();
     this._emit(null);
@@ -856,6 +1073,7 @@
     this.input.removeEventListener('keydown', this._onKeydown);
     this.menu.removeEventListener('mousedown', this._onMenuDown);
     this.clearEl.removeEventListener('mousedown', this._onClearDown);
+    this.tagsEl.removeEventListener('mousedown', this._onTagsDown);
     if (this.root && this.root.parentNode) this.root.parentNode.removeChild(this.root);
   };
 
@@ -877,14 +1095,19 @@
     var sel = resolveEl(selectElOrSelector);
     if (!sel || sel.tagName !== 'SELECT') throw new Error('LiveSelect.enhance: a <select> is required.');
 
+    var isMulti = sel.multiple;
     var source = [];
     var initial = '', initialLabel = '';
+    var initialValues = [], initialLabels = [];
     var placeholder = '';
     for (var i = 0; i < sel.options.length; i++) {
       var op = sel.options[i];
       if (op.value === '' && !placeholder) { placeholder = op.textContent.trim(); continue; }
       source.push({ value: op.value, label: op.textContent.trim(), sublabel: op.getAttribute('data-sublabel') || '' });
-      if (op.selected) { initial = op.value; initialLabel = op.textContent.trim(); }
+      if (op.selected) {
+        initial = op.value; initialLabel = op.textContent.trim();
+        initialValues.push(op.value); initialLabels.push(op.textContent.trim());
+      }
     }
 
     var wasRequired = sel.required;
@@ -904,8 +1127,9 @@
     var opts = Object.assign({
       source: source,
       name: sel.getAttribute('name') || '',
-      value: initial,
-      valueLabel: initialLabel,
+      value: isMulti ? initialValues : initial,
+      valueLabel: isMulti ? initialLabels : initialLabel,
+      multiple: isMulti,
       placeholder: placeholder || (extra && extra.placeholder) || 'Search…',
       required: wasRequired,
       disabled: sel.disabled,
@@ -913,13 +1137,26 @@
 
     var userOnChange = opts.onChange;
     opts.onChange = function (value, option) {
-      // Reflect into the hidden <select> + fire its native change.
-      if (option && !Array.prototype.some.call(sel.options, function (o) { return o.value === value; })) {
-        var newOpt = document.createElement('option');
-        newOpt.value = value; newOpt.textContent = option.label;
-        sel.appendChild(newOpt);
+      if (isMulti) {
+        // Reflect the array of values back into the <select multiple>.
+        var set = {};
+        value.forEach(function (v) { set[v] = true; });
+        value.forEach(function (v) {
+          if (!Array.prototype.some.call(sel.options, function (o) { return o.value === v; })) {
+            var added = document.createElement('option');
+            added.value = v; added.textContent = v; sel.appendChild(added);
+          }
+        });
+        Array.prototype.forEach.call(sel.options, function (o) { o.selected = !!set[o.value]; });
+      } else {
+        // Reflect a single value into the <select> + create the option if new.
+        if (option && !Array.prototype.some.call(sel.options, function (o) { return o.value === value; })) {
+          var newOpt = document.createElement('option');
+          newOpt.value = value; newOpt.textContent = option.label;
+          sel.appendChild(newOpt);
+        }
+        sel.value = value;
       }
-      sel.value = value;
       sel.dispatchEvent(new Event('change', { bubbles: true }));
       if (typeof userOnChange === 'function') userOnChange(value, option);
     };
