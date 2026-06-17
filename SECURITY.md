@@ -15,7 +15,8 @@ is available we'll credit you (unless you prefer otherwise) in the release notes
 
 | Version | Supported |
 |---------|-----------|
-| 1.x     | ✅        |
+| 4.x     | ✅        |
+| < 4.0   | ❌        |
 
 ## Security model (what this library does and doesn't guarantee)
 
@@ -37,6 +38,6 @@ The MongoDB/Express backend (`server/liveselect-mongo.js`) enforces:
 
 **The consumer is responsible for** authentication (`authorize` middleware),
 CSRF protection on `POST /create`, rate limiting on `/search`, transport
-security (HTTPS), and appropriate database indexes. See `IMPLEMENTATION.md §8`.
+security (HTTPS), and appropriate database indexes. See `IMPLEMENTATION.md §9`.
 Mounting the router without `authorize` and without `tenantFilter` exposes the
 whole collection by design — opt into protection deliberately.
