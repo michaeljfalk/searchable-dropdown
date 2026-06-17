@@ -24,7 +24,7 @@ Node/Express, EJS templates, and Blaze**.
 - ♿ **Accessible by default** — full ARIA combobox/listbox wiring (`aria-activedescendant`, `aria-selected`, live-region announcements) so keyboard nav is screen-reader friendly. Optional **grouped options** with `<optgroup>`-style headings.
 - 🧰 **Polish where it counts** — real `required` form validation, disabled (non-selectable) options, match highlighting, a “Showing N of M” hint, async result caching, and `open`/`close`/`search` lifecycle events.
 - 🔒 **Security-hardened server** — registry-gated collection access, field allow-listing, ReDoS-capped regex, scope filters, tenant isolation hook, prototype-pollution guards.
-- 📦 **Zero dependencies**, ~12 KB. Works as a `<script>` tag (`window.LiveSelect`), a CommonJS `require`, or an ES module `import`.
+- 📦 **Zero dependencies**, ~14 KB gzipped (JS) + ~2 KB CSS. Works as a `<script>` tag (`window.LiveSelect`), a CommonJS `require`, or an ES module `import`.
 
 ## Install
 
@@ -361,10 +361,11 @@ npm test      # Node's built-in runner (node --test)
 ```
 
 The suite (in `test/`) covers the client in jsdom (HTML-escaping/XSS, the hidden
-input form mirror, `liveselect:change`, `enhance()`), the pure server helpers, and the
+input form mirror, `liveselect:change`, `enhance()`, templates, a11y wiring,
+grouping, validation, and multiple selection), the pure server helpers, and the
 router against an in-memory MongoDB — including the security regressions from the
 audit (no document disclosure, generic errors, NoSQL operator-injection,
-allow-listing, dedup). CI runs them on Node 18/20/22 (`.github/workflows/ci.yml`).
+allow-listing, dedup). CI runs them on Node 18/20/22/24 (`.github/workflows/ci.yml`).
 The library itself ships with **zero runtime dependencies**.
 
 ## Releasing

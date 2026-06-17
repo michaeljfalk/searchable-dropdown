@@ -7,11 +7,12 @@ the way you mount it differs.
 - [1. Plain HTML + vanilla JS](#1-plain-html--vanilla-js)
 - [2. Replacing a native `<select>`](#2-replacing-a-native-select)
 - [3. The `[+ Add new]` create flow](#3-the--add-new-create-flow)
-- [4. MongoDB data source (Node/Express)](#4-mongodb-data-source-nodeexpress)
-- [5. EJS templates](#5-ejs-templates)
-- [6. Blaze (Meteor)](#6-blaze-meteor)
-- [7. Theming to match your app](#7-theming-to-match-your-app)
-- [8. Security model](#8-security-model)
+- [4. Multiple selection](#4-multiple-selection)
+- [5. MongoDB data source (Node/Express)](#5-mongodb-data-source-nodeexpress)
+- [6. EJS templates](#6-ejs-templates)
+- [7. Blaze (Meteor)](#7-blaze-meteor)
+- [8. Theming to match your app](#8-theming-to-match-your-app)
+- [9. Security model](#9-security-model)
 
 ---
 
@@ -56,6 +57,10 @@ the selection back into it** — so any code already listening to that `<select>
 `change` event keeps working. An empty-value first option becomes the
 placeholder. Add `data-sublabel="…"` on an `<option>` to give it a second line.
 
+A **`<select multiple>`** is auto-detected and upgraded to [multiple
+selection](#4-multiple-selection); each chosen value is kept in sync on the
+original element's `<option>`s.
+
 ---
 
 ## 3. The `[+ Add new]` create flow
@@ -91,17 +96,61 @@ Customize the row text with `createLabel: (q) => '+ New customer “' + q + '”
 
 ---
 
-## 4. MongoDB data source (Node/Express)
+## 4. Multiple selection
+
+Set `multiple: true` for a tags/chips control. Selections render as removable
+chips and the value becomes an **array** everywhere:
+
+```js
+new LiveSelect('#tags', {
+  name: 'tags',
+  multiple: true,
+  source: ['react', 'vue', 'svelte', 'angular'],
+  maxItems: 3,                              // optional cap
+  onChange: (values, options) => console.log(values),   // ['react','vue']
+});
+```
+
+Add by clicking a row or typing + Enter; remove via a chip's × or Backspace on an
+empty input; re-selecting a chosen row toggles it off. `getValue()` returns an
+array, `setValue([...])` accepts one, and `liveselect:change` carries
+`{ name, value: [], options: [] }`.
+
+**Plain-form submission** is controlled by `submitFormat`:
+
+| `submitFormat` | Hidden inputs | Server sees (`name="tags"`) |
+|---|---|---|
+| `'repeat'` *(default)* | one input per value, sharing the name | `tags=a&tags=b` → array in Express/most frameworks; matches native `<select multiple>` |
+| `'bracket'` | `name="tags[]"` per value | `tags[]=a&tags[]=b` → array in PHP/Rails |
+| `'delimited'` | one input, values joined by `delimiter` (default `,`) | `tags=a,b` → split server-side |
+
+So for an Express app, the default needs no server changes:
+
+```js
+app.post('/save', (req, res) => {
+  const tags = [].concat(req.body.tags || []);  // always normalize to an array
+  // …
+});
+```
+
+`enhance()` on a `<select multiple>` produces the same control automatically.
+
+---
+
+## 5. MongoDB data source (Node/Express)
 
 The server backend lives in
 [`server/liveselect-mongo.js`](./server/liveselect-mongo.js).
 It exposes a **registry** and an Express **router** with three routes per key:
 
 ```
-GET  /:key/search?q=&limit=&scope[x]=   → [ { value, label, sublabel, raw } ]
+GET  /:key/search?q=&limit=&scope[x]=   → [ { value, label, sublabel } ]
 GET  /:key/option/:id                   → option | null
 POST /:key/create   { fields, scope }   → option   (201)
 ```
+
+> Responses carry only `{ value, label, sublabel }` — the raw document is omitted
+> unless the entry opts in with `exposeRaw: true` (see the [Security model](#9-security-model)).
 
 ### Wire it up
 
@@ -142,8 +191,15 @@ const api = LiveSelect.remoteSource({ baseUrl: '/api/dropdown', key: 'customers'
 new LiveSelect('#customer', {
   name: 'customerId', source: api.source, resolve: api.resolve,
   allowCreate: true, onCreate: api.onCreate,
+  cache: true,             // optional: memoize repeat query+scope results
 });
 ```
+
+`remoteSource` passes the per-search `AbortSignal` to `fetch`, so when the user
+keeps typing, superseded requests are **cancelled** automatically (not just
+ignored). Add `cache: true` to skip the network for repeat queries; it's cleared
+by `setSource()` / `setScope()`. A custom async `source` gets the same `signal`
+on `ctx` — forward it to your own `fetch` to opt in.
 
 Using Mongo `ObjectId`s? Pass `castId: (id) => new ObjectId(id)` in the entry so
 `/option/:id` and lookups match. A complete runnable demo is in
@@ -154,7 +210,7 @@ Using Mongo `ObjectId`s? Pass `castId: (id) => new ObjectId(id)` in the entry so
 
 ---
 
-## 5. EJS templates
+## 6. EJS templates
 
 Two ways. **Declarative (recommended)** keeps server data out of `<script>`
 tags entirely — it travels as HTML-escaped `data-*` attributes that the
@@ -190,7 +246,7 @@ Or, for a static array, `data-options='<%= JSON.stringify(list) %>'`.
 
 ---
 
-## 6. Blaze (Meteor)
+## 7. Blaze (Meteor)
 
 Use the adapter in [`examples/blaze/`](./examples/blaze/). It mounts the vanilla
 class in `onRendered`, so Blaze never reimplements the picker:
@@ -208,7 +264,7 @@ back it with Meteor methods (`<key>.search` / `<key>.option`). Vendor
 
 ---
 
-## 7. Theming to match your app
+## 8. Theming to match your app
 
 Everything reads from `--liveselect-*` custom properties (see the top of
 `liveselect.css`). The fastest path to "matches our other inputs":
@@ -228,7 +284,7 @@ entirely.
 
 ---
 
-## 8. Security model
+## 9. Security model
 
 Enforced by the Express backend:
 
@@ -269,9 +325,16 @@ Enforced by the Express backend:
 
 ### A note on `required`
 
-Native browser `required` validation needs a focusable, visible field, which a
-hidden mirror input isn't — so the control's `required` option drives the `*`
-marker but does **not** block submission on its own. `enhance()` deliberately
-removes `required` from the hidden `<select>` to avoid the "An invalid form
-control is not focusable" submit-blocking bug. Enforce required selections via
-the `liveselect:change` event (client) and/or on the server.
+A `required` LiveSelect **does** block form submission when nothing is selected.
+Native browser validation needs a focusable, visible field — which the hidden
+mirror input isn't — so the control enforces `required` on its **visible input**
+via the Constraint Validation API (`setCustomValidity`). The browser shows a
+focusable, on-screen validation bubble and blocks submit; customize the message
+with `texts.required`. In multiple mode, the constraint is satisfied once at
+least one chip is present.
+
+`enhance()` removes `required` from the now-`display:none` `<select>` (a hidden
+control can't be focused, which otherwise triggers Chrome's "An invalid form
+control is not focusable" submit-blocking bug) and moves enforcement to the
+visible control. As always, **also validate on the server** — client validation
+is a UX nicety, not a security boundary.
