@@ -20,6 +20,7 @@ Node/Express, EJS templates, and Blaze**.
 - 🔁 **Drop-in `<select>` replacement** — `LiveSelect.enhance(selectEl)` upgrades an existing `<select>` in place; a hidden `<input name>` means it submits inside a plain `<form>` like a native control.
 - 🎨 **Fully themeable** — restyle with `--liveselect-*` CSS custom properties or target the BEM-ish classes; ships a light and dark theme.
 - 🧩 **Custom item templates** — render each result row _and_ the `[+ Add]` row however you like with `renderOption` / `renderCreate`; return a DOM node (XSS-safe) or an HTML string. See [Custom item templates](#custom-item-templates).
+- ♿ **Accessible by default** — full ARIA combobox/listbox wiring (`aria-activedescendant`, `aria-selected`, live-region announcements) so keyboard nav is screen-reader friendly. Optional **grouped options** with `<optgroup>`-style headings.
 - 🔒 **Security-hardened server** — registry-gated collection access, field allow-listing, ReDoS-capped regex, scope filters, tenant isolation hook, prototype-pollution guards.
 - 📦 **Zero dependencies**, ~12 KB. Works as a `<script>` tag (`window.LiveSelect`), a CommonJS `require`, or an ES module `import`.
 
@@ -173,12 +174,17 @@ per-framework integration (HTML, Express, EJS, Blaze).
 | `renderCreate` | `(q, ctx) => Node\|string\|null` | — | Custom template for the `[+ Add]` row. |
 | `onCreate` | `async (q, ctx) => option\|null` | — | Do anything; return an option to auto-select. |
 | `onChange` | `(value, option) => void` | — | Fires on every selection/clear. |
+| `groupBy` | `(option) => string` | — | Group results under headings. See [Grouped options](#grouped-options). |
 | `classPrefix` | `string` | `'liveselect'` | CSS class prefix. |
 | `texts` | `object` | — | `{ searching, noResults, searchFailed }`. |
 
-**Option shape:** `{ value, label, sublabel?, raw? }`. Loose input is normalized —
+**Option shape:** `{ value, label, sublabel?, group?, raw? }`. Loose input is normalized —
 a bare string becomes `{ value, label }`; `_id`/`id` map to `value`;
 `name`/`title`/`text` map to `label`.
+
+**Async source `ctx`:** `{ scope, limit, query, signal }`. `signal` is an
+`AbortSignal` that fires when a newer search supersedes the current one — pass it
+to `fetch` (the built-in `remoteSource` already does) to cancel stale requests.
 
 ## Custom item templates
 
@@ -219,6 +225,44 @@ The normalized option passed in is `{ value, label, sublabel, raw }`, where
 `raw` is the original source record — use it for any fields beyond
 label/sublabel. The `createLabel` option still works for a plain-text add row;
 `renderCreate` supersedes it when both are set.
+
+## Grouped options
+
+Render results under headings (like `<optgroup>`) by giving options a `group`
+field, or by passing a `groupBy(option) => string` function (which takes
+precedence). Results are **stably reordered** so same-group items sit together,
+preserving the order each group was first seen — so your source doesn't have to
+pre-sort.
+
+```js
+new LiveSelect('#picker', {
+  source: [
+    { value: 'ca', label: 'California', group: 'US' },
+    { value: 'on', label: 'Ontario',    group: 'Canada' },
+    { value: 'tx', label: 'Texas',      group: 'US' },
+  ],
+  // or, instead of per-option group:
+  // groupBy: (opt) => opt.raw.country,
+});
+```
+
+Group headings render as `.liveselect__group` (a non-selectable, sticky label) —
+style them like any other token.
+
+## Accessibility
+
+The control implements the [ARIA combobox/listbox pattern](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/):
+
+- the input is `role="combobox"` with `aria-expanded`, `aria-controls`, and
+  `aria-autocomplete="list"`;
+- the menu is `role="listbox"`; each row is `role="option"` with a stable `id`;
+- the active row carries `aria-selected="true"` and the input's
+  `aria-activedescendant` points at it, so arrow-key navigation is announced;
+- a visually-hidden `aria-live="polite"` region announces result counts,
+  “Searching…”, and the no-matches / create state.
+
+Full keyboard support: ↑/↓ to move, Enter to select (or trigger `[+ Add]`),
+Esc to close.
 
 ## Instance API
 

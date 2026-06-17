@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [3.2.0] - 2026-06-17
+
+### Added
+- **Accessibility (ARIA combobox/listbox pattern).** Options now get stable `id`s;
+  the active row carries `aria-selected` and is referenced by the input's
+  `aria-activedescendant`; the input gains `aria-controls` / `aria-haspopup`; and a
+  visually-hidden `aria-live="polite"` region announces result counts, “Searching…”,
+  and the no-matches/create state. Keyboard nav is now announced to screen readers.
+- **AbortSignal for async sources.** The async `source` `ctx` now includes a real
+  `signal` (`{ scope, limit, query, signal }`). A newer search aborts the previous
+  one's signal, and the built-in `remoteSource` passes it to `fetch`, so stale
+  in-flight requests are cancelled rather than merely ignored. (`destroy()` also
+  aborts any in-flight request.)
+- **Grouped options.** Pass a `groupBy(option) => string` function or a per-option
+  `group` field to render `<optgroup>`-style headings (`.liveselect__group`).
+  Results are stably reordered so same-group items sit together.
+
+### Changed
+- `normalizeOption` output now includes a `group` field (`''` when absent).
+
 ## [3.1.0] - 2026-06-17
 
 ### Added

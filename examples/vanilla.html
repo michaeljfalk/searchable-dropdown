@@ -65,6 +65,11 @@
   <div id="picker4"></div>
   <div class="out" id="out4">value: (none)</div>
 
+  <!-- ===== 5. Grouped options ===== -->
+  <h2>5 · Grouped options (optgroup-style headings)</h2>
+  <div id="picker5"></div>
+  <div class="out" id="out5">value: (none)</div>
+
   <!-- 2. The script — exposes window.LiveSelect. -->
   <script src="../dist/liveselect.js"></script>
   <script>
@@ -131,6 +136,23 @@
     function initials(name) {
       return name.split(/\s+/).map(function (p) { return p[0]; }).slice(0, 2).join('').toUpperCase();
     }
+
+    // 5 · Grouped options — out-of-order source, stably grouped under headings.
+    new LiveSelect('#picker5', {
+      label: 'Region',
+      placeholder: 'Search regions…',
+      source: [
+        { value: 'ca', label: 'California',   group: 'United States' },
+        { value: 'on', label: 'Ontario',      group: 'Canada' },
+        { value: 'tx', label: 'Texas',        group: 'United States' },
+        { value: 'bc', label: 'British Columbia', group: 'Canada' },
+        { value: 'ny', label: 'New York',     group: 'United States' },
+      ],
+      onChange: function (value, option) {
+        document.getElementById('out5').textContent =
+          'value: ' + JSON.stringify(value) + (option ? '  ·  ' + option.group : '');
+      },
+    });
 
     new LiveSelect('#picker4', {
       name: 'assignee',
