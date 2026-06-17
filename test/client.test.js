@@ -120,3 +120,73 @@ test('enhance() can create a brand-new option and reflect it into the select', {
   assert.ok(Array.prototype.some.call(sel.options, (o) => o.value === 'yyz'));
   dd.destroy();
 });
+
+test('renderOption: DOM-node template controls each row, nav hooks preserved', { skip: !domAvailable }, () => {
+  const host = mount();
+  const dd = new LiveSelect(host, {
+    source: [{ value: 'ca', label: 'Canada', sublabel: 'CA', raw: { flag: '🇨🇦' } }],
+    renderOption: (o, ctx) => {
+      const span = document.createElement('span');
+      span.className = 'flagrow';
+      span.textContent = o.raw.flag + ' ' + o.label + ' #' + ctx.index;
+      return span;
+    },
+  });
+  dd.query = '';
+  dd.isOpen = true;
+  dd._runSearch();
+  dd._renderMenu();
+
+  const btn = dd.menu.querySelector('[data-liveselect-opt]');
+  assert.ok(btn, 'outer button still owns the data-liveselect-opt hook');
+  assert.equal(btn.getAttribute('data-liveselect-index'), '0');
+  assert.equal(btn.querySelector('.flagrow').textContent, '🇨🇦 Canada #0');
+  // Default label/sublabel spans are NOT emitted when a template renders.
+  assert.equal(btn.querySelector('.liveselect__opt-label'), null);
+  dd.destroy();
+});
+
+test('renderOption: string return is injected as HTML (caller owns escaping)', { skip: !domAvailable }, () => {
+  const host = mount();
+  const dd = new LiveSelect(host, {
+    source: [{ value: '1', label: 'Acme', sublabel: 'corp' }],
+    renderOption: (o, ctx) => '<em class="tmpl">' + ctx.escapeHtml(o.label) + '</em>',
+  });
+  dd.query = ''; dd.isOpen = true; dd._runSearch(); dd._renderMenu();
+  const em = dd.menu.querySelector('.tmpl');
+  assert.ok(em, 'string template HTML is parsed into the row');
+  assert.equal(em.textContent, 'Acme');
+  dd.destroy();
+});
+
+test('renderOption: returning null falls back to default escaped rendering', { skip: !domAvailable }, () => {
+  const host = mount();
+  const dd = new LiveSelect(host, {
+    source: [{ value: '1', label: '<b>x</b>', sublabel: 'sub' }],
+    renderOption: () => null,   // opt out per-row → default render
+  });
+  dd.query = ''; dd.isOpen = true; dd._runSearch(); dd._renderMenu();
+  assert.ok(dd.menu.querySelector('.liveselect__opt-label'), 'default label span present');
+  assert.equal(dd.menu.querySelector('b'), null, 'default render still escapes markup');
+  dd.destroy();
+});
+
+test('renderCreate: custom template for the [+ Add] row', { skip: !domAvailable }, () => {
+  const host = mount();
+  const dd = new LiveSelect(host, {
+    source: [],
+    allowCreate: true,
+    onCreate: (q) => ({ value: q, label: q }),
+    renderCreate: (q) => {
+      const b = document.createElement('strong');
+      b.className = 'mk';
+      b.textContent = 'Create “' + q + '”';
+      return b;
+    },
+  });
+  dd.query = 'Zeta'; dd.isOpen = true; dd.results = []; dd._renderMenu();
+  const createBtn = dd.menu.querySelector('[data-liveselect-create]');
+  assert.ok(createBtn, 'create button keeps its data-liveselect-create hook');
+  assert.equal(createBtn.querySelector('.mk').textContent, 'Create “Zeta”');
+  dd.destroy();
+});

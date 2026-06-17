@@ -167,7 +167,9 @@ per-framework integration (HTML, Express, EJS, Blaze).
 | `limit` | `number` | `20` | Max results shown/requested. |
 | `scope` | `object` | `{}` | Passed to async source / `onCreate` as `ctx.scope`. |
 | `allowCreate` | `boolean` | `false` | Show the `[+ Add]` row when no exact match. |
-| `createLabel` | `(q) => string` | `+ Add "q"` | Add-row label. |
+| `createLabel` | `(q) => string` | `+ Add "q"` | Add-row label (plain text). |
+| `renderOption` | `(option, ctx) => Node\|string\|null` | — | Custom template for each result row. See [Custom item templates](#custom-item-templates). |
+| `renderCreate` | `(q, ctx) => Node\|string\|null` | — | Custom template for the `[+ Add]` row. |
 | `onCreate` | `async (q, ctx) => option\|null` | — | Do anything; return an option to auto-select. |
 | `onChange` | `(value, option) => void` | — | Fires on every selection/clear. |
 | `classPrefix` | `string` | `'liveselect'` | CSS class prefix. |
@@ -176,6 +178,46 @@ per-framework integration (HTML, Express, EJS, Blaze).
 **Option shape:** `{ value, label, sublabel?, raw? }`. Loose input is normalized —
 a bare string becomes `{ value, label }`; `_id`/`id` map to `value`;
 `name`/`title`/`text` map to `label`.
+
+## Custom item templates
+
+By default each row renders an escaped two-line `label` / `sublabel`. To render
+anything else — avatars, badges, multi-column layouts — pass `renderOption`
+(for result rows) and/or `renderCreate` (for the `[+ Add]` row). The control
+still owns the outer `<button>` (ARIA roles, keyboard navigation, click
+handling); your function only supplies the **inner** content.
+
+Each function may return:
+
+- a **DOM `Node`** — appended as-is, **XSS-safe by construction** (recommended);
+- a **string** — set as the row's `innerHTML`; **you own escaping** here, so run
+  untrusted data through `ctx.escapeHtml` (also exposed as `LiveSelect.escapeHtml`);
+- `null` / `undefined` — fall back to the default escaped rendering for that row.
+
+```js
+new LiveSelect('#customer', {
+  source: customers,                       // options carry the full record on `raw`
+  // ctx = { index, query, active, escapeHtml }
+  renderOption: (opt, ctx) => {
+    const row = document.createElement('div');
+    row.className = 'cust-row';
+    row.innerHTML =
+      `<img class="cust-avatar" src="${ctx.escapeHtml(opt.raw.avatarUrl)}" alt="">` +
+      `<span class="cust-name">${ctx.escapeHtml(opt.label)}</span>` +
+      `<span class="cust-tier">${ctx.escapeHtml(opt.raw.tier)}</span>`;
+    return row;                            // DOM Node → safe
+  },
+  allowCreate: true,
+  onCreate: (q) => ({ value: q, label: q }),
+  // ctx = { query, active, escapeHtml }
+  renderCreate: (q, ctx) => `➕ Add new customer “<strong>${ctx.escapeHtml(q)}</strong>”`,
+});
+```
+
+The normalized option passed in is `{ value, label, sublabel, raw }`, where
+`raw` is the original source record — use it for any fields beyond
+label/sublabel. The `createLabel` option still works for a plain-text add row;
+`renderCreate` supersedes it when both are set.
 
 ## Instance API
 

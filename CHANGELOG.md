@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [3.1.0] - 2026-06-17
+
+### Added
+- **Custom item templates.** New `renderOption(option, ctx)` and
+  `renderCreate(query, ctx)` options let you render arbitrary content for each
+  result row and for the `[+ Add]` row. Each may return a DOM `Node` (XSS-safe),
+  an HTML string (you own escaping — `ctx.escapeHtml` / `LiveSelect.escapeHtml`
+  provided), or `null` to fall back to the default escaped label/sublabel. The
+  control still owns the outer `<button>`, so ARIA roles, keyboard navigation,
+  and click handling are unchanged.
+- Exposed `LiveSelect.escapeHtml` for use inside string-returning templates.
+
+### Changed
+- The dropdown menu now builds its rows as DOM nodes rather than one `innerHTML`
+  string. Behavior and the default escaped rendering are unchanged.
+
 ## [3.0.0] - 2026-06-16
 
 ### Changed (breaking)

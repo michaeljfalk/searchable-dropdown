@@ -42,6 +42,14 @@
  *   scope         object passed to the async source / onCreate as ctx.scope
  *   allowCreate   show the "+ Add" row when no exact match (default false)
  *   createLabel   (query) => string for the add row (default: `+ Add "query"`)
+ *   renderOption  (option, ctx) => Node|string|null — custom content for each
+ *                 result row. Return a DOM Node (XSS-safe) or an HTML string
+ *                 (you own escaping; ctx.escapeHtml is provided). Return null to
+ *                 use the default escaped label/sublabel. ctx = { index, query,
+ *                 active, escapeHtml }. The outer <button> (roles, keyboard nav,
+ *                 click handling) stays managed by the control.
+ *   renderCreate  (query, ctx) => Node|string|null — same contract for the
+ *                 "+ Add" row. ctx = { query, active, escapeHtml }.
  *   onCreate      async (query, ctx) => option|null — do ANYTHING (open a modal,
  *                 POST to a server, push to the array); return the new option to
  *                 auto-select it, or null to cancel.
@@ -423,38 +431,107 @@
     this.errorEl.hidden = !this.error;
   };
 
+  /** Append a small <div class="prefix__msg"> message row to the menu. */
+  LiveSelect.prototype._msgEl = function (text) {
+    var el = document.createElement('div');
+    el.className = this.cp + '__msg';
+    el.textContent = text;       // textContent → never interprets markup
+    return el;
+  };
+
+  /**
+   * Apply a renderOption/renderCreate return value to a row element.
+   *   - DOM Node  → appended as-is (XSS-safe by construction)
+   *   - string    → set as innerHTML (caller owns escaping; ctx.escapeHtml given)
+   *   - null/''-ish nullish → caller wants the default; signal with `false`
+   * Returns true when the custom content was applied, false to fall back.
+   */
+  LiveSelect.prototype._applyRendered = function (el, out) {
+    if (out == null) return false;                 // undefined/null → default render
+    if (typeof out === 'string') { el.innerHTML = out; return true; }
+    if (out.nodeType) { el.appendChild(out); return true; }
+    return false;                                  // unknown return → default render
+  };
+
+  /** Fill a result <button> with custom (renderOption) or default content. */
+  LiveSelect.prototype._fillOption = function (btn, o, index) {
+    var cp = this.cp;
+    if (typeof this.opts.renderOption === 'function') {
+      var ctx = {
+        index: index,
+        query: this.query.trim(),
+        active: this.activeIndex === index,
+        escapeHtml: escapeHtml,
+      };
+      if (this._applyRendered(btn, this.opts.renderOption(o, ctx))) return;
+    }
+    // Default: escaped two-line label / sublabel.
+    var lab = document.createElement('span');
+    lab.className = cp + '__opt-label';
+    lab.textContent = o.label;
+    btn.appendChild(lab);
+    if (o.sublabel) {
+      var sub = document.createElement('span');
+      sub.className = cp + '__opt-sub';
+      sub.textContent = o.sublabel;
+      btn.appendChild(sub);
+    }
+  };
+
+  /** Fill the "+ Add" <button> with custom (renderCreate) or default content. */
+  LiveSelect.prototype._fillCreate = function (btn, q) {
+    if (typeof this.opts.renderCreate === 'function') {
+      var ctx = {
+        query: q,
+        active: this.activeIndex === this.results.length,
+        escapeHtml: escapeHtml,
+      };
+      if (this._applyRendered(btn, this.opts.renderCreate(q, ctx))) return;
+    }
+    btn.textContent = typeof this.opts.createLabel === 'function'
+      ? this.opts.createLabel(q)
+      : '+ Add “' + q + '”';
+  };
+
   LiveSelect.prototype._renderMenu = function () {
     var cp = this.cp;
     if (!this.isOpen) { this.menu.hidden = true; return; }
 
-    var html = '';
-    if (this.loading) {
-      html = '<div class="' + cp + '__msg">' + escapeHtml(this.texts.searching) + '</div>';
-    } else {
-      for (var i = 0; i < this.results.length; i++) {
-        var o = this.results[i];
-        var active = this.activeIndex === i ? (' ' + cp + '__opt--active') : '';
-        html += '<button type="button" role="option" class="' + cp + '__opt' + active + '"'
-          + ' data-liveselect-opt data-liveselect-index="' + i + '">'
-          + '<span class="' + cp + '__opt-label">' + escapeHtml(o.label) + '</span>'
-          + (o.sublabel ? '<span class="' + cp + '__opt-sub">' + escapeHtml(o.sublabel) + '</span>' : '')
-          + '</button>';
-      }
+    this.menu.textContent = '';   // clear previous rows
 
-      var canCreate = this._canCreate();
-      if (!this.results.length && !canCreate) {
-        html += '<div class="' + cp + '__msg">' + escapeHtml(this.texts.noResults) + '</div>';
-      }
-      if (canCreate) {
-        var createActive = this.activeIndex === this.results.length ? (' ' + cp + '__opt--active') : '';
-        var label = typeof this.opts.createLabel === 'function'
-          ? this.opts.createLabel(this.query.trim())
-          : '+ Add “' + this.query.trim() + '”';
-        html += '<button type="button" class="' + cp + '__opt ' + cp + '__opt--create' + createActive + '"'
-          + ' data-liveselect-create>' + escapeHtml(label) + '</button>';
-      }
+    if (this.loading) {
+      this.menu.appendChild(this._msgEl(this.texts.searching));
+      this.menu.hidden = false;
+      this._renderError();
+      return;
     }
-    this.menu.innerHTML = html;
+
+    for (var i = 0; i < this.results.length; i++) {
+      var o = this.results[i];
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.setAttribute('role', 'option');
+      btn.className = cp + '__opt' + (this.activeIndex === i ? ' ' + cp + '__opt--active' : '');
+      btn.setAttribute('data-liveselect-opt', '');
+      btn.setAttribute('data-liveselect-index', String(i));
+      this._fillOption(btn, o, i);
+      this.menu.appendChild(btn);
+    }
+
+    var canCreate = this._canCreate();
+    if (!this.results.length && !canCreate) {
+      this.menu.appendChild(this._msgEl(this.texts.noResults));
+    }
+    if (canCreate) {
+      var createActive = this.activeIndex === this.results.length ? (' ' + cp + '__opt--active') : '';
+      var cbtn = document.createElement('button');
+      cbtn.type = 'button';
+      cbtn.className = cp + '__opt ' + cp + '__opt--create' + createActive;
+      cbtn.setAttribute('data-liveselect-create', '');
+      this._fillCreate(cbtn, this.query.trim());
+      this.menu.appendChild(cbtn);
+    }
+
     this.menu.hidden = false;
     this._renderError();
   };
@@ -674,6 +751,7 @@
   };
 
   LiveSelect.normalizeOption = normalizeOption;
+  LiveSelect.escapeHtml = escapeHtml;
 
   return LiveSelect;
 }));

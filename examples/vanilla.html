@@ -16,6 +16,21 @@
     button.go { margin-top: 14px; padding: 9px 16px; border: 0; border-radius: 8px; background: #2563eb; color: #fff; cursor: pointer; }
     /* Example theme override scoped to one field: */
     #themed .liveselect { --liveselect-border: #7c3aed; --liveselect-accent: #7c3aed; --liveselect-radius: 14px; }
+
+    /* ---- Custom item template styles (section 4) ---- */
+    .user-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+    .user-avatar { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+      color: #fff; font: 600 0.72rem system-ui, sans-serif; }
+    .user-main { display: flex; flex-direction: column; min-width: 0; }
+    .user-name { font-weight: 600; }
+    .user-email { font-size: 0.78rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; }
+    .user-tier { margin-left: auto; flex: 0 0 auto; font-size: 0.68rem; font-weight: 700; letter-spacing: .03em;
+      text-transform: uppercase; padding: 2px 7px; border-radius: 999px; }
+    .user-tier--pro { background: #ede9fe; color: #6d28d9; }
+    .user-tier--free { background: #e2e8f0; color: #475569; }
+    .user-create { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+    .user-create .plus { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+      background: #2563eb; color: #fff; font-size: 0.9rem; line-height: 1; }
   </style>
 </head>
 <body>
@@ -44,6 +59,11 @@
     <option value="gb">United Kingdom</option>
   </select>
   <div class="out" id="out3">native select value: (none)</div>
+
+  <!-- ===== 4. Custom item templates (renderOption / renderCreate) ===== -->
+  <h2>4 · Custom item templates (avatar · email · tier badge)</h2>
+  <div id="picker4"></div>
+  <div class="out" id="out4">value: (none)</div>
 
   <!-- 2. The script — exposes window.LiveSelect. -->
   <script src="../dist/liveselect.js"></script>
@@ -97,6 +117,81 @@
       document.getElementById('out3').textContent = 'native select value: ' + JSON.stringify(nativeSel.value);
     });
     LiveSelect.enhance('#native', { allowCreate: false });
+
+    // 4 · Custom item templates via renderOption / renderCreate.
+    //     Each option carries the full record on `raw`, so the template can use
+    //     fields beyond label/sublabel (here: email, tier, avatar colour).
+    var users = [
+      { value: 'u1', label: 'Ada Lovelace',   email: 'ada@analytical.io',  tier: 'pro',  color: '#7c3aed' },
+      { value: 'u2', label: 'Alan Turing',    email: 'alan@bombe.ac.uk',   tier: 'pro',  color: '#2563eb' },
+      { value: 'u3', label: 'Grace Hopper',   email: 'grace@navy.mil',     tier: 'free', color: '#0d9488' },
+      { value: 'u4', label: 'Katherine Johnson', email: 'kat@nasa.gov',    tier: 'free', color: '#db2777' },
+    ];
+
+    function initials(name) {
+      return name.split(/\s+/).map(function (p) { return p[0]; }).slice(0, 2).join('').toUpperCase();
+    }
+
+    new LiveSelect('#picker4', {
+      name: 'assignee',
+      label: 'Assignee',
+      placeholder: 'Search people…',
+      // Pass records as { value, label, raw } so `raw` carries the extra fields.
+      source: users.map(function (u) { return { value: u.value, label: u.label, sublabel: u.email, raw: u }; }),
+
+      // renderOption returns a DOM Node → XSS-safe, no manual escaping needed.
+      renderOption: function (opt, ctx) {
+        var u = opt.raw;
+        var row = document.createElement('div');
+        row.className = 'user-row';
+
+        var avatar = document.createElement('span');
+        avatar.className = 'user-avatar';
+        avatar.style.background = u.color;
+        avatar.textContent = initials(u.label);   // textContent → safe
+
+        var main = document.createElement('span');
+        main.className = 'user-main';
+        var name = document.createElement('span');
+        name.className = 'user-name';
+        name.textContent = u.label;
+        // ctx.query lets a template highlight the match if it wants to.
+        var email = document.createElement('span');
+        email.className = 'user-email';
+        email.textContent = u.email;
+        main.appendChild(name);
+        main.appendChild(email);
+
+        var tier = document.createElement('span');
+        tier.className = 'user-tier user-tier--' + u.tier;
+        tier.textContent = u.tier;
+
+        row.appendChild(avatar);
+        row.appendChild(main);
+        row.appendChild(tier);
+        return row;
+      },
+
+      // renderCreate templates the [+ Add] row. Returning an HTML string here to
+      // show the other contract — ctx.escapeHtml guards the user-typed query.
+      allowCreate: true,
+      renderCreate: function (query, ctx) {
+        return '<span class="user-create"><span class="plus">+</span>Invite “' +
+          ctx.escapeHtml(query) + '” by email</span>';
+      },
+      onCreate: function (query) {
+        var u = { value: 'new-' + query.toLowerCase().replace(/\s+/g, '-'),
+          label: query, email: query.toLowerCase().replace(/\s+/g, '.') + '@invited',
+          tier: 'free', color: '#475569' };
+        users.push(u);
+        return { value: u.value, label: u.label, sublabel: u.email, raw: u };
+      },
+
+      onChange: function (value, option) {
+        document.getElementById('out4').textContent =
+          'value: ' + JSON.stringify(value) + (option ? '  ·  ' + option.raw.email : '');
+      },
+    });
   </script>
 </body>
 </html>
