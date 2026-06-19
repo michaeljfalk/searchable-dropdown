@@ -46,8 +46,7 @@ import LiveSelect from './dist/liveselect.mjs';
 
 ## Consuming it in another project
 
-The npm package name is **`@michaeljfalk/liveselect`** (scoped — the bare
-`liveselect` was blocked by npm's name-similarity guard). Pick whichever path
+The npm package name is **`@michaeljfalk/liveselect`** (scoped). Pick whichever path
 fits the consuming project — there's nothing to build for the component itself.
 
 > The only thing a host app needs to install is its own `express` + `mongodb`
