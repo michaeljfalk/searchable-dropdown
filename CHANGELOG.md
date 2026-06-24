@@ -3,6 +3,42 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [4.0.4] - 2026-06-24
+
+### Fixed
+- **ESM entry is now a real module — fixes `import LiveSelect` resolving to
+  `undefined` under every bundler.** The published `dist/liveselect.mjs` (the
+  `exports.import` / `module` target) was a shim that re-read
+  `globalThis.LiveSelect`. Under a bundler (Meteor 3 + rspack, webpack, Vite, …)
+  `import './liveselect.js'` resolves the UMD core with `module.exports` present,
+  so the UMD takes the CommonJS branch and **never sets the global** — the shim
+  then exported `undefined`, and `new LiveSelect(...)` threw "not a constructor".
+  `dist/liveselect.mjs` now contains the implementation and `export default`s the
+  class directly, so bundler and browser-native `import` both get the real
+  constructor. `<script>` tag (`window.LiveSelect`) and `require()` are unchanged.
+
+### Changed
+- **Single source of truth + dev-only build.** The control now lives in
+  `src/liveselect.js` (a real ES module); `dist/liveselect.js` (UMD) and
+  `dist/liveselect.mjs` (ESM) are generated from it by `npm run build`
+  (esbuild — a build-time devDependency only). **Zero runtime dependencies** is
+  preserved. No more hand-maintained second copy of the class. CI rebuilds and
+  fails if the committed `dist/` drifts from `src/`; `prepublishOnly` rebuilds
+  before publish.
+
+### Tests
+- Added `test/bundler-smoke.test.js`: bundles `import LiveSelect from
+  '@michaeljfalk/liveselect'` with esbuild in `--bundle --format=esm` (a faithful
+  stand-in for rspack/webpack) and asserts the default export is the class and
+  `new LiveSelect(...)` constructs — this would have caught the 4.0.3 bug. Also
+  re-asserts the `require()` and `<script>`-tag/global paths still yield the class.
+
+### Notes
+- `dist/liveselect-auto.js` is unchanged: it is a `<script>`-tag-only declarative
+  auto-mounter whose contract is "load `liveselect.js` first", so reading
+  `window.LiveSelect` is correct for its environment; it is not part of the
+  ESM/CJS class surface that was broken.
+
 ## [4.0.3] - 2026-06-17
 
 ### Fixed

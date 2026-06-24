@@ -19,6 +19,11 @@ jobs:
           cache: npm
       - name: Install dev dependencies
         run: npm install --no-audit --no-fund
+      - name: Verify committed dist/ matches a fresh build from src/
+        run: |
+          npm run build
+          git diff --exit-code -- dist/liveselect.js dist/liveselect.mjs \
+            || { echo "::error::dist/ is stale — run 'npm run build' and commit the result"; exit 1; }
       - name: Syntax check distributables
         run: |
           node --check dist/liveselect.js
